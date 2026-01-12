@@ -72,3 +72,14 @@ esp_err_t led_off(uint8_t channel)
 {
     return led_set_brightness(channel, 0);
 }
+
+esp_err_t led_deinit(uint8_t channel)
+{
+    esp_err_t ret = ledc_stop(LEDC_LOW_SPEED_MODE, channel, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "LEDC stop failed");
+        return ret;
+    }
+    ESP_LOGI(TAG, "LED channel %d deinitialized", channel);
+    return ESP_OK;
+}

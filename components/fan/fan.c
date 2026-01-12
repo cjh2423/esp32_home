@@ -70,4 +70,15 @@ esp_err_t fan_set_speed(uint8_t speed)
     return ret;
 }
 
+esp_err_t fan_deinit(void)
+{
+    esp_err_t ret = ledc_stop(LEDC_LOW_SPEED_MODE, g_fan_channel, 255);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Fan LEDC stop failed");
+        return ret;
+    }
+    ESP_LOGI(TAG, "Fan channel %d deinitialized", g_fan_channel);
+    return ESP_OK;
+}
+
 // 移除 humidifier_control

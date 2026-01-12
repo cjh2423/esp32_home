@@ -15,11 +15,18 @@ esp_err_t fan_init(uint8_t fan_gpio, uint8_t fan_channel);
 
 /**
  * @brief 设置风扇速度
- * 
+ *
  * @param speed 0-255
- * @return esp_err_t 
+ * @return esp_err_t
  */
 esp_err_t fan_set_speed(uint8_t speed);
+
+/**
+ * @brief 释放风扇 PWM 资源
+ *
+ * @return esp_err_t
+ */
+esp_err_t fan_deinit(void);
 
 // 移除 humidifier_control
 

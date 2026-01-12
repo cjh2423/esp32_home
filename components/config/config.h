@@ -4,10 +4,10 @@
 // ==================== WiFi 配置 ====================
 // 输入您的 WiFi 名称和密码
 #ifndef WIFI_SSID
-#define WIFI_SSID "YOUR_SSID"
+#define WIFI_SSID "007"
 #endif
 #ifndef WIFI_PASS
-#define WIFI_PASS "YOUR_PASSWORD"
+#define WIFI_PASS "liujiaming"
 #endif
 #define WIFI_MAXIMUM_RETRY 5
 
@@ -53,8 +53,11 @@
 
 // ==================== 传感器阈值配置 ====================
 // 温度阈值
-#define TEMP_HIGH_THRESHOLD 30.0f   // 高温阈值（℃）
+#define TEMP_HIGH_THRESHOLD 30.0f   // 高温阈值（℃）- 风扇低速
+#define TEMP_MEDIUM_THRESHOLD 32.0f // 中温阈值（℃）- 风扇中速
+#define TEMP_CRITICAL_THRESHOLD 35.0f // 高温阈值（℃）- 风扇全速
 #define TEMP_LOW_THRESHOLD 15.0f    // 低温阈值（℃）
+#define TEMP_HYSTERESIS 2.0f        // 温度滞回值（℃）
 
 // 湿度阈值
 #define HUMIDITY_HIGH_THRESHOLD 80.0f  // 高湿度阈值（%）
@@ -62,9 +65,23 @@
 
 // 光照阈值
 #define LIGHT_LOW_THRESHOLD 100.0f  // 低光照阈值 (lux)
+#define LIGHT_HYSTERESIS 20.0f      // 光照滞回值 (lux)
 
 // 烟雾阈值 (ADC原始值 0-4095)
 #define SMOKE_THRESHOLD 1000
+
+// 蜂鸣器配置
+#define BUZZER_BEEP_DURATION_MS 200  // 蜂鸣器报警时长(毫秒)
+
+// 风扇速度档位
+#define FAN_SPEED_OFF 0
+#define FAN_SPEED_LOW 150
+#define FAN_SPEED_MEDIUM 200
+#define FAN_SPEED_HIGH 255
+
+// LED 亮度档位
+#define LED_BRIGHTNESS_OFF 0
+#define LED_BRIGHTNESS_MAX 255
 
 // ==================== 系统配置 ====================
 // 传感器读取间隔（毫秒）

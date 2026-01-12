@@ -32,10 +32,18 @@ esp_err_t led_on(uint8_t channel);
 
 /**
  * @brief 关闭 LED
- * 
+ *
  * @param channel PWM通道
  * @return esp_err_t ESP_OK 成功，其他值失败
  */
 esp_err_t led_off(uint8_t channel);
+
+/**
+ * @brief 释放 LED PWM 资源
+ *
+ * @param channel PWM通道
+ * @return esp_err_t ESP_OK 成功，其他值失败
+ */
+esp_err_t led_deinit(uint8_t channel);
 
 #endif // LED_H
