@@ -21,7 +21,7 @@ esp_err_t mq2_init(adc1_channel_t adc_channel)
     // 配置ADC通道
     adc_oneshot_chan_cfg_t config = {
         .bitwidth = ADC_BITWIDTH_12,
-        .atten = ADC_ATTEN_DB_11,  // 0-3.3V范围
+        .atten = ADC_ATTEN_DB_12,  // 0-3.3V范围 (ESP-IDF 5.x)
     };
     
     ret = adc_oneshot_config_channel(adc1_handle, adc_channel, &config);

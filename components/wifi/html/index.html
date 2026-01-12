@@ -1,71 +1,401 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-<meta charset='UTF-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1.0'>
-<title>智能家居控制系统</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能家居</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@300;500;700&display=swap" rel="stylesheet">
 <style>
-body{font-family:Arial,sans-serif;margin:0;padding:20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}
-.container{max-width:800px;margin:0 auto;background:white;border-radius:15px;padding:30px;box-shadow:0 10px 40px rgba(0,0,0,0.3);}
-h1{color:#667eea;text-align:center;margin-bottom:30px;}
-.card{background:#f8f9fa;border-radius:10px;padding:20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
-.card h2{color:#764ba2;margin-top:0;}
-.sensor-value{font-size:24px;font-weight:bold;color:#667eea;margin:10px 0;}
-.control-btn{background:#667eea;color:white;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:16px;margin:5px;transition:all 0.3s;}
-.control-btn:hover{background:#764ba2;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.2);}
-.control-btn.off{background:#ccc;}
-.slider{width:100%;height:8px;border-radius:5px;background:#ddd;outline:none;}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0a0a0f;--card:#14141f;--card-border:#1e1e2e;
+--cyan:#00d4ff;--orange:#ff6b35;--green:#00ff88;--red:#ff4757;
+--text:#e8e8e8;--muted:#5a5a6e;
+}
+body{
+font-family:'Noto Sans SC',sans-serif;
+background:var(--bg);
+color:var(--text);
+min-height:100vh;
+padding:20px;
+background-image:
+radial-gradient(ellipse at 20% 80%,rgba(0,212,255,0.03) 0%,transparent 50%),
+radial-gradient(ellipse at 80% 20%,rgba(255,107,53,0.03) 0%,transparent 50%);
+}
+.header{
+text-align:center;
+padding:20px 0 30px;
+border-bottom:1px solid var(--card-border);
+margin-bottom:30px;
+}
+.header h1{
+font-weight:300;
+font-size:1.4rem;
+letter-spacing:8px;
+text-transform:uppercase;
+color:var(--muted);
+}
+.header .status{
+display:inline-flex;
+align-items:center;
+gap:8px;
+margin-top:12px;
+font-family:'JetBrains Mono',monospace;
+font-size:0.75rem;
+color:var(--green);
+}
+.header .status::before{
+content:'';
+width:6px;height:6px;
+background:var(--green);
+border-radius:50%;
+animation:pulse 2s infinite;
+}
+@keyframes pulse{
+0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,255,136,0.4)}
+50%{opacity:0.6;box-shadow:0 0 0 8px rgba(0,255,136,0)}
+}
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+gap:16px;
+max-width:720px;
+margin:0 auto;
+}
+.gauge{
+background:var(--card);
+border:1px solid var(--card-border);
+border-radius:16px;
+padding:24px 16px;
+text-align:center;
+position:relative;
+overflow:hidden;
+transition:all 0.3s ease;
+}
+.gauge:hover{
+border-color:var(--cyan);
+transform:translateY(-2px);
+}
+.gauge::before{
+content:'';
+position:absolute;
+top:0;left:0;right:0;
+height:2px;
+background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+opacity:0;
+transition:opacity 0.3s;
+}
+.gauge:hover::before{opacity:1}
+.gauge-ring{
+width:100px;height:100px;
+margin:0 auto 16px;
+position:relative;
+}
+.gauge-ring svg{
+transform:rotate(-90deg);
+width:100%;height:100%;
+}
+.gauge-ring circle{
+fill:none;
+stroke-width:6;
+stroke-linecap:round;
+}
+.gauge-ring .bg{stroke:var(--card-border)}
+.gauge-ring .fg{
+stroke:var(--cyan);
+stroke-dasharray:251.2;
+stroke-dashoffset:251.2;
+transition:stroke-dashoffset 1s ease;
+}
+.gauge-ring.temp .fg{stroke:var(--orange)}
+.gauge-ring.smoke .fg{stroke:var(--red)}
+.gauge-ring.light .fg{stroke:#ffd93d}
+.gauge-value{
+position:absolute;
+top:50%;left:50%;
+transform:translate(-50%,-50%);
+font-family:'JetBrains Mono',monospace;
+font-size:1.5rem;
+font-weight:600;
+}
+.gauge-label{
+font-size:0.75rem;
+color:var(--muted);
+text-transform:uppercase;
+letter-spacing:2px;
+}
+.gauge-unit{
+font-size:0.7rem;
+color:var(--muted);
+font-family:'JetBrains Mono',monospace;
+margin-top:4px;
+}
+.section-title{
+font-size:0.7rem;
+color:var(--muted);
+letter-spacing:4px;
+text-transform:uppercase;
+margin:40px 0 20px;
+max-width:720px;
+margin-left:auto;
+margin-right:auto;
+padding-left:4px;
+}
+.controls{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+gap:16px;
+max-width:720px;
+margin:0 auto;
+}
+.device{
+background:var(--card);
+border:1px solid var(--card-border);
+border-radius:16px;
+padding:20px;
+display:flex;
+flex-direction:column;
+gap:16px;
+transition:all 0.3s ease;
+}
+.device:hover{border-color:var(--cyan)}
+.device-header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+.device-name{
+font-size:0.9rem;
+font-weight:500;
+display:flex;
+align-items:center;
+gap:10px;
+}
+.device-icon{
+width:32px;height:32px;
+background:rgba(0,212,255,0.1);
+border-radius:8px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:1rem;
+}
+.toggle{
+width:52px;height:28px;
+background:var(--card-border);
+border-radius:14px;
+position:relative;
+cursor:pointer;
+transition:all 0.3s ease;
+border:none;
+}
+.toggle.on{background:var(--cyan)}
+.toggle::after{
+content:'';
+position:absolute;
+width:22px;height:22px;
+background:#fff;
+border-radius:50%;
+top:3px;left:3px;
+transition:all 0.3s ease;
+}
+.toggle.on::after{left:27px}
+.slider-wrap{
+display:flex;
+flex-direction:column;
+gap:8px;
+}
+.slider-label{
+display:flex;
+justify-content:space-between;
+font-size:0.75rem;
+color:var(--muted);
+}
+.slider-value{
+font-family:'JetBrains Mono',monospace;
+color:var(--cyan);
+}
+.slider{
+-webkit-appearance:none;
+width:100%;
+height:4px;
+background:var(--card-border);
+border-radius:2px;
+outline:none;
+}
+.slider::-webkit-slider-thumb{
+-webkit-appearance:none;
+width:16px;height:16px;
+background:var(--cyan);
+border-radius:50%;
+cursor:pointer;
+box-shadow:0 0 10px rgba(0,212,255,0.5);
+transition:all 0.2s;
+}
+.slider::-webkit-slider-thumb:hover{
+transform:scale(1.2);
+box-shadow:0 0 20px rgba(0,212,255,0.8);
+}
+.footer{
+text-align:center;
+margin-top:40px;
+padding:20px;
+font-size:0.7rem;
+color:var(--muted);
+font-family:'JetBrains Mono',monospace;
+letter-spacing:1px;
+}
+@media(max-width:480px){
+.grid{grid-template-columns:repeat(2,1fr);gap:12px}
+.gauge{padding:16px 12px}
+.gauge-ring{width:80px;height:80px}
+.gauge-value{font-size:1.2rem}
+.controls{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
-<div class='container'>
-<h1>🏠 智能家居控制系统</h1>
-<div class='card'>
-<h2>📊 环境监测</h2>
-<div>温度: <span class='sensor-value' id='temp'>--</span> °C</div>
-<div>湿度: <span class='sensor-value' id='humi'>--</span> %</div>
-<div>光照: <span class='sensor-value' id='light'>--</span> lux</div>
-<div>烟雾: <span class='sensor-value' id='smoke'>--</span></div>
+<header class="header">
+<h1>智能家居</h1>
+<div class="status">SYSTEM ONLINE</div>
+</header>
+
+<div class="section-title">环境监测</div>
+<div class="grid">
+<div class="gauge">
+<div class="gauge-ring temp">
+<svg viewBox="0 0 100 100">
+<circle class="bg" cx="50" cy="50" r="40"/>
+<circle class="fg" id="tempRing" cx="50" cy="50" r="40"/>
+</svg>
+<div class="gauge-value" id="temp">--</div>
 </div>
-<div class='card'>
-<h2>💡 设备控制</h2>
-<button class='control-btn' id='ledBtn' onclick='toggleLED()'>LED: OFF</button>
-<button class='control-btn' id='fanBtn' onclick='toggleFan()'>风扇: OFF</button>
-<button class='control-btn' id='curtainBtn' onclick='toggleCurtain()'>窗帘: CLOSED</button>
-<div style='margin-top:20px;'>
-<label>LED亮度: <span id='brightness'>0</span></label>
-<input type='range' min='0' max='255' value='0' class='slider' id='brightnessSlider' oninput='setBrightness(this.value)'>
+<div class="gauge-label">温度</div>
+<div class="gauge-unit">°C</div>
 </div>
-<div style='margin-top:20px;'>
-<label>风扇速度: <span id='fanSpeed'>0</span></label>
-<input type='range' min='0' max='255' value='0' class='slider' id='fanSpeedSlider' oninput='setFanSpeed(this.value)'>
+<div class="gauge">
+<div class="gauge-ring">
+<svg viewBox="0 0 100 100">
+<circle class="bg" cx="50" cy="50" r="40"/>
+<circle class="fg" id="humiRing" cx="50" cy="50" r="40"/>
+</svg>
+<div class="gauge-value" id="humi">--</div>
+</div>
+<div class="gauge-label">湿度</div>
+<div class="gauge-unit">%</div>
+</div>
+<div class="gauge">
+<div class="gauge-ring light">
+<svg viewBox="0 0 100 100">
+<circle class="bg" cx="50" cy="50" r="40"/>
+<circle class="fg" id="lightRing" cx="50" cy="50" r="40"/>
+</svg>
+<div class="gauge-value" id="light">--</div>
+</div>
+<div class="gauge-label">光照</div>
+<div class="gauge-unit">LUX</div>
+</div>
+<div class="gauge">
+<div class="gauge-ring smoke">
+<svg viewBox="0 0 100 100">
+<circle class="bg" cx="50" cy="50" r="40"/>
+<circle class="fg" id="smokeRing" cx="50" cy="50" r="40"/>
+</svg>
+<div class="gauge-value" id="smoke">--</div>
+</div>
+<div class="gauge-label">烟雾</div>
+<div class="gauge-unit">ADC</div>
+</div>
+</div>
+
+<div class="section-title">设备控制</div>
+<div class="controls">
+<div class="device">
+<div class="device-header">
+<div class="device-name">
+<div class="device-icon">💡</div>
+<span>照明系统</span>
+</div>
+<button class="toggle" id="ledToggle" onclick="toggleLED()"></button>
+</div>
+<div class="slider-wrap">
+<div class="slider-label">
+<span>亮度</span>
+<span class="slider-value" id="brightness">0</span>
+</div>
+<input type="range" min="0" max="255" value="0" class="slider" id="brightnessSlider" oninput="setBrightness(this.value)">
+</div>
+</div>
+<div class="device">
+<div class="device-header">
+<div class="device-name">
+<div class="device-icon">🌀</div>
+<span>通风系统</span>
+</div>
+<button class="toggle" id="fanToggle" onclick="toggleFan()"></button>
+</div>
+<div class="slider-wrap">
+<div class="slider-label">
+<span>转速</span>
+<span class="slider-value" id="fanSpeed">0</span>
+</div>
+<input type="range" min="0" max="255" value="0" class="slider" id="fanSpeedSlider" oninput="setFanSpeed(this.value)">
+</div>
+</div>
+<div class="device">
+<div class="device-header">
+<div class="device-name">
+<div class="device-icon">🪟</div>
+<span>智能窗帘</span>
+</div>
+<button class="toggle" id="curtainToggle" onclick="toggleCurtain()"></button>
+</div>
+<div class="slider-wrap">
+<div class="slider-label">
+<span>状态</span>
+<span class="slider-value" id="curtainStatus">关闭</span>
 </div>
 </div>
 </div>
+</div>
+
+<footer class="footer">
+ESP32-S3 SMART HOME v1.0
+</footer>
+
 <script>
+const C=251.2;
+function setRing(id,pct){
+document.getElementById(id).style.strokeDashoffset=C*(1-Math.min(pct,1));
+}
 function updateData(){
 fetch('/api/data').then(r=>r.json()).then(d=>{
 document.getElementById('temp').innerText=d.temperature.toFixed(1);
-document.getElementById('humi').innerText=d.humidity.toFixed(1);
-document.getElementById('light').innerText=d.light.toFixed(1);
+document.getElementById('humi').innerText=d.humidity.toFixed(0);
+document.getElementById('light').innerText=d.light.toFixed(0);
 document.getElementById('smoke').innerText=d.smoke;
-document.getElementById('ledBtn').innerText='LED: '+(d.led_state?'ON':'OFF');
-document.getElementById('ledBtn').className='control-btn'+(d.led_state?'':' off');
-document.getElementById('fanBtn').innerText='风扇: '+(d.fan_state?'ON':'OFF');
-document.getElementById('fanBtn').className='control-btn'+(d.fan_state?'':' off');
-document.getElementById('curtainBtn').innerText='窗帘: '+(d.curtain_state?'OPEN':'CLOSED');
-document.getElementById('curtainBtn').className='control-btn'+(d.curtain_state?'':' off');
+setRing('tempRing',d.temperature/50);
+setRing('humiRing',d.humidity/100);
+setRing('lightRing',Math.min(d.light/1000,1));
+setRing('smokeRing',d.smoke/4095);
+document.getElementById('ledToggle').className='toggle'+(d.led_state?' on':'');
+document.getElementById('fanToggle').className='toggle'+(d.fan_state?' on':'');
+document.getElementById('curtainToggle').className='toggle'+(d.curtain_state?' on':'');
 document.getElementById('brightness').innerText=d.led_brightness;
 document.getElementById('brightnessSlider').value=d.led_brightness;
 document.getElementById('fanSpeed').innerText=d.fan_speed;
 document.getElementById('fanSpeedSlider').value=d.fan_speed;
-});}
-function toggleLED(){fetch('/api/led/toggle').then(()=>updateData());}
-function toggleFan(){fetch('/api/fan/toggle').then(()=>updateData());}
-function toggleCurtain(){fetch('/api/curtain/toggle').then(()=>updateData());}
-function setBrightness(v){fetch('/api/led/brightness?value='+v).then(()=>updateData());}
-function setFanSpeed(v){fetch('/api/fan/speed?value='+v).then(()=>updateData());}
-setInterval(updateData,2000);updateData();
+document.getElementById('curtainStatus').innerText=d.curtain_state?'开启':'关闭';
+}).catch(()=>{});
+}
+function toggleLED(){fetch('/api/led/toggle').then(updateData)}
+function toggleFan(){fetch('/api/fan/toggle').then(updateData)}
+function toggleCurtain(){fetch('/api/curtain/toggle').then(updateData)}
+function setBrightness(v){fetch('/api/led/brightness?value='+v).then(updateData)}
+function setFanSpeed(v){fetch('/api/fan/speed?value='+v).then(updateData)}
+setInterval(updateData,2000);
+updateData();
 </script>
 </body>
 </html>
