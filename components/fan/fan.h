@@ -9,10 +9,9 @@
  * 
  * @param fan_gpio 风扇GPIO
  * @param fan_channel 风扇PWM通道
- * @param unused_gpio 加湿器GPIO (已废弃，传任意值)
  * @return esp_err_t 
  */
-esp_err_t fan_init(uint8_t fan_gpio, uint8_t fan_channel, int8_t unused_gpio);
+esp_err_t fan_init(uint8_t fan_gpio, uint8_t fan_channel);
 
 /**
  * @brief 设置风扇速度

@@ -5,12 +5,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include <string.h>
+#include "config.h"
 
 static const char *TAG = "WIFI";
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
-#define MAXIMUM_RETRY 5
 
 static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
@@ -26,11 +26,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < MAXIMUM_RETRY) {
+        if (s_retry_num < WIFI_MAXIMUM_RETRY) {
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "Retry to connect to the AP (attempt %d/%d)", 
-                     s_retry_num, MAXIMUM_RETRY);
+                     s_retry_num, WIFI_MAXIMUM_RETRY);
         } else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
             ESP_LOGE(TAG, "Failed to connect to AP");

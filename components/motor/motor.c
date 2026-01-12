@@ -27,11 +27,8 @@ static uint32_t calculate_duty(int angle)
     return (pulse_width * 8191) / 20000;
 }
 
-esp_err_t motor_init(uint8_t step_gpio, uint8_t dir_gpio, uint8_t en_gpio)
+esp_err_t motor_init(uint8_t servo_gpio)
 {
-    // 参数 step_gpio 实际在这里被用作 SERVO_GPIO
-    // 其他两个参数忽略
-    
     // 1. 定时器配置
     ledc_timer_config_t ledc_timer = {
         .speed_mode       = LEDC_LOW_SPEED_MODE,
@@ -48,13 +45,13 @@ esp_err_t motor_init(uint8_t step_gpio, uint8_t dir_gpio, uint8_t en_gpio)
         .channel        = SERVO_PWM_CHANNEL,
         .timer_sel      = SERVO_PWM_TIMER,
         .intr_type      = LEDC_INTR_DISABLE,
-        .gpio_num       = SERVO_GPIO,  // 使用 config.h 中的宏
+        .gpio_num       = servo_gpio,
         .duty           = calculate_duty(0), // 初始 0度
         .hpoint         = 0
     };
     ledc_channel_config(&ledc_channel);
     
-    ESP_LOGI(TAG, "Servo Motor initialized on GPIO %d", SERVO_GPIO);
+    ESP_LOGI(TAG, "Servo Motor initialized on GPIO %d", servo_gpio);
     return ESP_OK;
 }
 

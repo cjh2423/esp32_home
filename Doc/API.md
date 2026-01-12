@@ -16,7 +16,6 @@
     "led_brightness": 128,
     "fan_state": 1,
     "fan_speed": 200,
-    "humidifier_state": 0,
     "curtain_state": 0
 }
 ```

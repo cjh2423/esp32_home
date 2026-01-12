@@ -1,7 +1,10 @@
 #include "http_server.h"
 #include "esp_log.h"
 #include "cJSON.h"
+#include "app_state.h"
+#include "config.h"
 #include <string.h>
+#include <stdlib.h>
 
 static const char *TAG = "HTTP_SERVER";
 static sensor_data_t *g_sensor_data = NULL;
@@ -27,33 +30,57 @@ static esp_err_t api_data_handler(httpd_req_t *req)
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
-    
+
+    sensor_data_t snapshot;
+    app_state_lock();
+    snapshot = *g_sensor_data;
+    app_state_unlock();
+
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "temperature", g_sensor_data->temperature);
-    cJSON_AddNumberToObject(root, "humidity", g_sensor_data->humidity);
-    cJSON_AddNumberToObject(root, "light", g_sensor_data->light);
-    cJSON_AddNumberToObject(root, "smoke", g_sensor_data->smoke);
-    cJSON_AddNumberToObject(root, "led_state", g_sensor_data->led_state);
-    cJSON_AddNumberToObject(root, "led_brightness", g_sensor_data->led_brightness);
-    cJSON_AddNumberToObject(root, "fan_state", g_sensor_data->fan_state);
-    cJSON_AddNumberToObject(root, "fan_speed", g_sensor_data->fan_speed);
-    cJSON_AddNumberToObject(root, "humidifier_state", g_sensor_data->humidifier_state);
-    cJSON_AddNumberToObject(root, "curtain_state", g_sensor_data->curtain_state);
-    
-    const char *json_str = cJSON_Print(root);
+    if (root == NULL) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    cJSON_AddNumberToObject(root, "temperature", snapshot.temperature);
+    cJSON_AddNumberToObject(root, "humidity", snapshot.humidity);
+    cJSON_AddNumberToObject(root, "light", snapshot.light);
+    cJSON_AddNumberToObject(root, "smoke", snapshot.smoke);
+    cJSON_AddNumberToObject(root, "led_state", snapshot.led_state);
+    cJSON_AddNumberToObject(root, "led_brightness", snapshot.led_brightness);
+    cJSON_AddNumberToObject(root, "fan_state", snapshot.fan_state);
+    cJSON_AddNumberToObject(root, "fan_speed", snapshot.fan_speed);
+    cJSON_AddNumberToObject(root, "curtain_state", snapshot.curtain_state);
+
+    char *json_str = cJSON_PrintUnformatted(root);
+    if (json_str == NULL) {
+        cJSON_Delete(root);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, json_str, strlen(json_str));
-    
-    free((void *)json_str);
+    esp_err_t resp_ret = httpd_resp_send(req, json_str, strlen(json_str));
+
+    free(json_str);
     cJSON_Delete(root);
-    return ESP_OK;
+    return resp_ret;
 }
 
 // LED控制处理（这些只是示例，实际控制需要在主程序中实现）
 static esp_err_t api_led_toggle_handler(httpd_req_t *req)
 {
     if (g_sensor_data != NULL) {
-        g_sensor_data->led_state = !g_sensor_data->led_state;
+        app_state_lock();
+        if (g_sensor_data->led_state == 0) {
+            g_sensor_data->led_state = 1;
+            if (g_sensor_data->led_brightness == 0) {
+                g_sensor_data->led_brightness = 255;
+            }
+        } else {
+            g_sensor_data->led_state = 0;
+            g_sensor_data->led_brightness = 0;
+        }
+        app_state_unlock();
     }
     httpd_resp_send(req, "OK", 2);
     return ESP_OK;
@@ -62,7 +89,17 @@ static esp_err_t api_led_toggle_handler(httpd_req_t *req)
 static esp_err_t api_fan_toggle_handler(httpd_req_t *req)
 {
     if (g_sensor_data != NULL) {
-        g_sensor_data->fan_state = !g_sensor_data->fan_state;
+        app_state_lock();
+        if (g_sensor_data->fan_state == 0) {
+            g_sensor_data->fan_state = 1;
+            if (g_sensor_data->fan_speed == 0) {
+                g_sensor_data->fan_speed = 255;
+            }
+        } else {
+            g_sensor_data->fan_state = 0;
+            g_sensor_data->fan_speed = 0;
+        }
+        app_state_unlock();
     }
     httpd_resp_send(req, "OK", 2);
     return ESP_OK;
@@ -73,7 +110,9 @@ static esp_err_t api_fan_toggle_handler(httpd_req_t *req)
 static esp_err_t api_curtain_toggle_handler(httpd_req_t *req)
 {
     if (g_sensor_data != NULL) {
+        app_state_lock();
         g_sensor_data->curtain_state = !g_sensor_data->curtain_state;
+        app_state_unlock();
     }
     httpd_resp_send(req, "OK", 2);
     return ESP_OK;
@@ -87,7 +126,13 @@ static esp_err_t api_led_brightness_handler(httpd_req_t *req)
         char param[32];
         if (httpd_query_key_value(buf, "value", param, sizeof(param)) == ESP_OK) {
             if (g_sensor_data != NULL) {
-                g_sensor_data->led_brightness = atoi(param);
+                int value = atoi(param);
+                if (value < 0) value = 0;
+                if (value > 255) value = 255;
+                app_state_lock();
+                g_sensor_data->led_brightness = (uint8_t)value;
+                g_sensor_data->led_state = (value > 0) ? 1 : 0;
+                app_state_unlock();
             }
         }
     }
@@ -103,9 +148,14 @@ static esp_err_t api_fan_speed_handler(httpd_req_t *req)
         char param[32];
         if (httpd_query_key_value(buf, "value", param, sizeof(param)) == ESP_OK) {
             if (g_sensor_data != NULL) {
-                g_sensor_data->fan_speed = atoi(param);
+                int value = atoi(param);
+                if (value < 0) value = 0;
+                if (value > 255) value = 255;
+                app_state_lock();
+                g_sensor_data->fan_speed = (uint8_t)value;
                 // 联动状态
                 g_sensor_data->fan_state = (g_sensor_data->fan_speed > 0) ? 1 : 0;
+                app_state_unlock();
             }
         }
     }
@@ -118,7 +168,7 @@ httpd_handle_t http_server_start(sensor_data_t *sensor_data)
     g_sensor_data = sensor_data;
     
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.server_port = 80;
+    config.server_port = HTTP_SERVER_PORT;
     config.max_uri_handlers = 12; // 增加handler数量限制
     
     httpd_handle_t server = NULL;

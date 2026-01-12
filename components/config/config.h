@@ -3,8 +3,12 @@
 
 // ==================== WiFi 配置 ====================
 // 输入您的 WiFi 名称和密码
-#define WIFI_SSID "007"
-#define WIFI_PASS "liujiaming"
+#ifndef WIFI_SSID
+#define WIFI_SSID "YOUR_SSID"
+#endif
+#ifndef WIFI_PASS
+#define WIFI_PASS "YOUR_PASSWORD"
+#endif
 #define WIFI_MAXIMUM_RETRY 5
 
 // ==================== GPIO 引脚配置 (ESP32-S3) ====================

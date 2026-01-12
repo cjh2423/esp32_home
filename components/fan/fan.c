@@ -6,7 +6,7 @@
 static const char *TAG = "FAN_CTRL";
 static uint8_t g_fan_channel;
 
-esp_err_t fan_init(uint8_t fan_gpio, uint8_t fan_channel, int8_t unused_humidifier_gpio)
+esp_err_t fan_init(uint8_t fan_gpio, uint8_t fan_channel)
 {
     g_fan_channel = fan_channel;
     

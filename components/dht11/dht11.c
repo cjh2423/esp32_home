@@ -55,11 +55,13 @@ esp_err_t dht11_read(dht11_data_t *data)
     uint8_t raw_data[5] = {0};
     
     // 发送起始信号
+    gpio_set_direction(dht11_gpio, GPIO_MODE_OUTPUT);
     gpio_set_level(dht11_gpio, 0);
     vTaskDelay(pdMS_TO_TICKS(20));  // 拉低至少18ms
     
     gpio_set_level(dht11_gpio, 1);
     delay_us(30);
+    gpio_set_direction(dht11_gpio, GPIO_MODE_INPUT);
     
     // 等待DHT11响应
     if (dht11_wait_for_state(0, 100) != ESP_OK) {

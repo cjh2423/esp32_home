@@ -5,14 +5,12 @@
 #include "esp_err.h"
 
 /**
- * @brief 初始化步进电机
- * 
- * @param step_gpio 步进脉冲引脚
- * @param dir_gpio 方向引脚
- * @param en_gpio 使能引脚
+ * @brief 初始化舵机控制
+ *
+ * @param servo_gpio 舵机PWM引脚
  * @return esp_err_t 
  */
-esp_err_t motor_init(uint8_t step_gpio, uint8_t dir_gpio, uint8_t en_gpio);
+esp_err_t motor_init(uint8_t servo_gpio);
 
 /**
  * @brief 控制窗帘开关

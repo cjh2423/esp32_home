@@ -18,7 +18,6 @@ typedef struct {
     uint8_t led_brightness;
     uint8_t fan_state;
     uint8_t fan_speed;
-    uint8_t humidifier_state;
     uint8_t curtain_state;
 } sensor_data_t;
 
