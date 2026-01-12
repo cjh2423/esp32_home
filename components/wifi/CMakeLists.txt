@@ -1,4 +1,3 @@
-idf_component_register(SRCS "wifi.c" "http_server.c"
+idf_component_register(SRCS "wifi.c"
                     INCLUDE_DIRS "."
-                    REQUIRES esp_wifi esp_netif esp_event esp_http_server json common config
-                    EMBED_FILES "html/index.html")
+                    REQUIRES esp_wifi esp_netif esp_event config)
