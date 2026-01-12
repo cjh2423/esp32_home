@@ -89,6 +89,6 @@ esp_err_t bh1750_read(i2c_port_t i2c_num, float *lux)
     uint16_t raw_value = (data[0] << 8) | data[1];
     *lux = raw_value / 1.2f;  // 转换为lux
     
-    ESP_LOGI(TAG, "Light intensity: %.1f lux", *lux);
+    ESP_LOGD(TAG, "Light intensity: %.1f lux", *lux);
     return ESP_OK;
 }
