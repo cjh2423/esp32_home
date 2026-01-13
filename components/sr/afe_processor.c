@@ -2,7 +2,8 @@
  * @file afe_processor.c
  * @brief ESP AFE (Audio Front-End) 音频处理器实现
  *
- * 参考 xiaozhi-esp32 afe_audio_processor.cc 实现
+ * 参考 xiaozhi-esp32 afe_wake_word.cc 实现
+ * 使用 AFE_TYPE_SR 模式，让 AFE 内部处理 WakeNet 检测
  */
 
 #include "afe_processor.h"
@@ -20,9 +21,10 @@ struct afe_processor {
     const esp_afe_sr_iface_t *afe_iface;
     esp_afe_sr_data_t *afe_data;
     srmodel_list_t *models;
-    bool models_owned;  // 是否拥有 models 的所有权
+    bool models_owned;
     int feed_chunksize;
     int fetch_chunksize;
+    bool wakenet_enabled;
 };
 
 afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config, srmodel_list_t *models)
@@ -32,27 +34,22 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
         return NULL;
     }
 
+    if (models == NULL) {
+        ESP_LOGE(TAG, "Models is NULL (required for AFE_TYPE_SR)");
+        return NULL;
+    }
+
     afe_processor_handle_t handle = calloc(1, sizeof(struct afe_processor));
     if (handle == NULL) {
         ESP_LOGE(TAG, "Failed to allocate handle");
         return NULL;
     }
 
-    // 加载或使用已有模型列表
-    if (models == NULL) {
-        handle->models = esp_srmodel_init("model");
-        handle->models_owned = true;
-        if (handle->models == NULL) {
-            ESP_LOGE(TAG, "Failed to init SR models");
-            free(handle);
-            return NULL;
-        }
-    } else {
-        handle->models = models;
-        handle->models_owned = false;
-    }
+    handle->models = models;
+    handle->models_owned = false;
+    handle->wakenet_enabled = config->enable_wakenet;
 
-    // 查找 NS 和 VAD 模型
+    // 查找模型
     char *ns_model_name = NULL;
     char *vad_model_name = NULL;
 
@@ -66,12 +63,13 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
     if (config->enable_vad) {
         vad_model_name = esp_srmodel_filter(handle->models, ESP_VADN_PREFIX, NULL);
         if (vad_model_name == NULL) {
-            ESP_LOGW(TAG, "VAD model not found, using default VAD");
+            ESP_LOGW(TAG, "VAD model not found, using default");
         }
     }
 
-    // 配置 AFE - 单麦克风模式 "M"
-    afe_config_t *afe_config = afe_config_init("M", NULL, AFE_TYPE_VC, AFE_MODE_HIGH_PERF);
+    // 配置 AFE - 关键：使用 AFE_TYPE_SR 并传入 models (参考 xiaozhi afe_wake_word.cc:73)
+    afe_type_t afe_type = config->enable_wakenet ? AFE_TYPE_SR : AFE_TYPE_VC;
+    afe_config_t *afe_config = afe_config_init("M", models, afe_type, AFE_MODE_HIGH_PERF);
     if (afe_config == NULL) {
         ESP_LOGE(TAG, "Failed to init AFE config");
         goto err_cleanup;
@@ -80,7 +78,7 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
     // AEC 配置 - 无扬声器，禁用 AEC
     afe_config->aec_init = false;
 
-    // VAD 配置 - 使用配置结构体中的参数
+    // VAD 配置
     afe_config->vad_init = config->enable_vad;
     afe_config->vad_mode = config->vad_mode;
     afe_config->vad_min_noise_ms = config->vad_min_noise_ms;
@@ -102,11 +100,12 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
     afe_config->agc_init = config->enable_agc;
 
     // 内存分配模式
-    if (config->use_psram) {
-        afe_config->memory_alloc_mode = AFE_MEMORY_ALLOC_MORE_PSRAM;
-    } else {
-        afe_config->memory_alloc_mode = AFE_MEMORY_ALLOC_MORE_INTERNAL;
-    }
+    afe_config->memory_alloc_mode = config->use_psram ?
+        AFE_MEMORY_ALLOC_MORE_PSRAM : AFE_MEMORY_ALLOC_MORE_INTERNAL;
+
+    // AFE 内部任务配置 (参考 xiaozhi afe_wake_word.cc:76-77)
+    afe_config->afe_perferred_core = config->afe_perferred_core;
+    afe_config->afe_perferred_priority = config->afe_perferred_priority;
 
     // 创建 AFE 实例
     handle->afe_iface = esp_afe_handle_from_config(afe_config);
@@ -125,10 +124,12 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
     handle->feed_chunksize = handle->afe_iface->get_feed_chunksize(handle->afe_data);
     handle->fetch_chunksize = handle->afe_iface->get_fetch_chunksize(handle->afe_data);
 
-    ESP_LOGI(TAG, "AFE created (feed: %d, fetch: %d, NS: %s, VAD: %s)",
+    ESP_LOGI(TAG, "AFE created (type: %s, feed: %d, fetch: %d, NS: %s, VAD: %s, WakeNet: %s)",
+             config->enable_wakenet ? "SR" : "VC",
              handle->feed_chunksize, handle->fetch_chunksize,
              ns_model_name ? "ON" : "OFF",
-             config->enable_vad ? "ON" : "OFF");
+             config->enable_vad ? "ON" : "OFF",
+             config->enable_wakenet ? "ON" : "OFF");
 
     afe_config_free(afe_config);
     return handle;
@@ -136,9 +137,6 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
 err_cleanup:
     if (afe_config) {
         afe_config_free(afe_config);
-    }
-    if (handle->models_owned && handle->models) {
-        // esp_srmodel_deinit 不存在，模型列表由 SDK 管理
     }
     free(handle);
     return NULL;
@@ -182,6 +180,39 @@ esp_err_t afe_processor_feed(afe_processor_handle_t handle, int16_t *data)
     return ESP_ERR_INVALID_STATE;
 }
 
+esp_err_t afe_processor_fetch_ex(afe_processor_handle_t handle,
+                                  afe_fetch_result_t *result,
+                                  uint32_t timeout_ms)
+{
+    if (handle == NULL || result == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (handle->afe_iface == NULL || handle->afe_data == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // 使用阻塞 fetch (参考 xiaozhi fetch_with_delay)
+    afe_fetch_result_t *res = handle->afe_iface->fetch_with_delay(
+        handle->afe_data, pdMS_TO_TICKS(timeout_ms));
+
+    if (res == NULL) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    if (res->ret_value == ESP_FAIL) {
+        return ESP_FAIL;
+    }
+
+    // 填充结果
+    result->data = res->data;
+    result->data_size = res->data_size;
+    result->vad_state = res->vad_state;
+    result->wakeup_state = res->wakeup_state;  // 关键：唤醒状态来自 AFE 内部
+
+    return ESP_OK;
+}
+
 esp_err_t afe_processor_fetch(afe_processor_handle_t handle, int16_t **out_data,
                                afe_vad_state_t *out_vad, uint32_t timeout_ms)
 {
@@ -222,6 +253,5 @@ void afe_processor_reset(afe_processor_handle_t handle)
 
 int afe_processor_get_sample_rate(afe_processor_handle_t handle)
 {
-    // AFE 固定使用 16kHz
     return 16000;
 }

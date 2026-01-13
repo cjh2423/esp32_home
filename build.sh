@@ -15,4 +15,5 @@ fi
 echo "编译中..."
 idf.py build
 echo "编译完成! 烧录到 $PORT ..."
-idf.py -p "$PORT" -b 921600 flash monitor
+idf.py -p "$PORT" -b 921600 flash
+echo "idf.py monitor"
