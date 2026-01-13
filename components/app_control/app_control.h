@@ -27,4 +27,11 @@ void app_control_process(sensor_data_t *data);
  */
 void app_control_handle_voice_command(vr_command_t command);
 
+/**
+ * @brief 处理 VAD 状态变化
+ *
+ * @param state VAD 状态 (语音/静音)
+ */
+void app_control_handle_vad_state(vr_vad_state_t state);
+
 #endif // APP_CONTROL_H

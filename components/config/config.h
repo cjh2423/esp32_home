@@ -56,6 +56,9 @@
 #define INMP441_I2S_WS   41  // I2S 字选择引脚
 #define INMP441_I2S_SD   42  // I2S 数据引脚
 
+// 10. RGB LED (WS2812 - 板载)
+#define RGB_LED_GPIO 48  // ESP32-S3 核心板板载 RGB LED
+
 // ==================== 语音识别配置 ====================
 // 唤醒词模型 (可选: wn9_hilexin, wn9_nihaoxiaozhi)
 #define SR_WAKENET_MODEL "wn9_nihaoxiaozhi"

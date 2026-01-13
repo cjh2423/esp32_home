@@ -22,6 +22,7 @@
 #include "motor.h"
 #include "buzzer.h"
 #include "voice_recognition.h"
+#include "rgb_led.h"
 
 static const char *TAG = "MAIN";
 
@@ -153,7 +154,15 @@ void app_main(void)
     
     // 舵机初始化，后两个参数由驱动内部忽略
     ESP_ERROR_CHECK(motor_init(SERVO_GPIO));
-    
+
+    // RGB LED 初始化 (板载 WS2812)
+    if (rgb_led_init(RGB_LED_GPIO) == ESP_OK) {
+        rgb_led_set_brightness(30);  // 设置亮度 30%
+        rgb_led_blink(RGB_COLOR_GREEN, 2, 100);  // 绿色闪烁2次表示启动
+    } else {
+        ESP_LOGW(TAG, "RGB LED Init Failed");
+    }
+
     // 开机自检
     buzzer_beep(BUZZER_GPIO, 100);
     
@@ -171,6 +180,7 @@ void app_main(void)
     // 5. 初始化语音识别 (Voice Recognition Layer)
     if (vr_init(INMP441_I2S_SCK, INMP441_I2S_WS, INMP441_I2S_SD,
                 app_control_handle_voice_command) == ESP_OK) {
+        vr_set_vad_callback(app_control_handle_vad_state);
         vr_start();
         ESP_LOGI(TAG, "Voice Recognition Started");
     } else {

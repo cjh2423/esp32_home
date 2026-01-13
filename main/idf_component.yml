@@ -1,3 +1,5 @@
 dependencies:
   # 依赖esp-sr组件
   espressif/esp-sr: "^2.3.0"
+  # RGB LED Strip 驱动
+  espressif/led_strip: "^2.5.0"

@@ -14,6 +14,7 @@
 #include "esp_mn_iface.h"
 #include "esp_mn_models.h"
 #include "esp_mn_speech_commands.h"
+#include "esp_vad.h"
 
 static const char *TAG = "VR";
 
@@ -26,11 +27,17 @@ static const char *s_commands[] = {
     "guan bi deng guang",   // ID 2: 关闭灯光
     "da kai feng shan",     // ID 3: 打开风扇
     "guan bi feng shan",    // ID 4: 关闭风扇
+    "hong se",              // ID 5: RGB 红色
+    "lv se",                // ID 6: RGB 绿色
+    "lan se",               // ID 7: RGB 蓝色
+    "guan bi cai deng",     // ID 8: RGB 关闭
 };
 #define NUM_COMMANDS (sizeof(s_commands) / sizeof(s_commands[0]))
 
 // 全局变量
 static vr_command_callback_t s_callback = NULL;
+static vr_vad_callback_t s_vad_callback = NULL;
+static vr_vad_state_t s_last_vad_state = VR_VAD_SILENCE;
 static TaskHandle_t s_feed_task_handle = NULL;
 static TaskHandle_t s_detect_task_handle = NULL;
 static volatile bool s_task_running = false;
@@ -63,6 +70,10 @@ static vr_command_t map_command_id(int id)
         case 2: return VR_CMD_LIGHT_OFF;
         case 3: return VR_CMD_FAN_ON;
         case 4: return VR_CMD_FAN_OFF;
+        case 5: return VR_CMD_RGB_RED;
+        case 6: return VR_CMD_RGB_GREEN;
+        case 7: return VR_CMD_RGB_BLUE;
+        case 8: return VR_CMD_RGB_OFF;
         default: return VR_CMD_UNKNOWN;
     }
 }
@@ -237,6 +248,15 @@ static void vr_detect_task(void *arg)
 
         if (ret != ESP_OK || result.data == NULL) {
             continue;
+        }
+
+        // VAD 状态变化通知 (用于 RGB LED 亮度指示)
+        vr_vad_state_t current_vad = (result.vad_state == VAD_SPEECH) ? VR_VAD_SPEECH : VR_VAD_SILENCE;
+        if (current_vad != s_last_vad_state) {
+            s_last_vad_state = current_vad;
+            if (s_vad_callback) {
+                s_vad_callback(current_vad);
+            }
         }
 
         // 状态机处理
@@ -434,4 +454,9 @@ esp_err_t vr_deinit(void)
 
     ESP_LOGI(TAG, "Voice recognition deinitialized");
     return ESP_OK;
+}
+
+void vr_set_vad_callback(vr_vad_callback_t callback)
+{
+    s_vad_callback = callback;
 }

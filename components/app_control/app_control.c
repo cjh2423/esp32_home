@@ -9,8 +9,16 @@
 #include "motor.h"
 #include "buzzer.h"
 #include "mq2.h" // 需要用到 mq2_is_smoke_detected
+#include "rgb_led.h"
 
 static const char *TAG = "APP_CTRL";
+
+// RGB LED 亮度配置
+#define RGB_BRIGHTNESS_BASE   20   // 基础亮度 (静音时)
+#define RGB_BRIGHTNESS_SPEECH 80   // 语音时亮度
+
+// 当前 RGB 颜色状态
+static rgb_color_t s_current_rgb_color = RGB_COLOR_OFF;
 
 // 滞回状态记录
 static struct {
@@ -191,11 +199,51 @@ void app_control_handle_voice_command(vr_command_t command)
             hysteresis_state.fan_on = false;
             break;
 
+        case VR_CMD_RGB_RED:
+            ESP_LOGI(TAG, "Voice: RGB Red");
+            s_current_rgb_color = RGB_COLOR_RED;
+            rgb_led_set_color(RGB_COLOR_RED);
+            break;
+
+        case VR_CMD_RGB_GREEN:
+            ESP_LOGI(TAG, "Voice: RGB Green");
+            s_current_rgb_color = RGB_COLOR_GREEN;
+            rgb_led_set_color(RGB_COLOR_GREEN);
+            break;
+
+        case VR_CMD_RGB_BLUE:
+            ESP_LOGI(TAG, "Voice: RGB Blue");
+            s_current_rgb_color = RGB_COLOR_BLUE;
+            rgb_led_set_color(RGB_COLOR_BLUE);
+            break;
+
+        case VR_CMD_RGB_OFF:
+            ESP_LOGI(TAG, "Voice: RGB Off");
+            s_current_rgb_color = RGB_COLOR_OFF;
+            rgb_led_off();
+            break;
+
         default:
             ESP_LOGW(TAG, "Unknown voice command: %d", command);
             break;
     }
 
     app_state_unlock();
+}
+
+void app_control_handle_vad_state(vr_vad_state_t state)
+{
+    if (s_current_rgb_color == RGB_COLOR_OFF) {
+        return;  // RGB LED 关闭时不响应 VAD
+    }
+
+    if (state == VR_VAD_SPEECH) {
+        rgb_led_set_brightness(RGB_BRIGHTNESS_SPEECH);
+    } else {
+        rgb_led_set_brightness(RGB_BRIGHTNESS_BASE);
+    }
+
+    // 重新设置颜色以应用新亮度
+    rgb_led_set_color(s_current_rgb_color);
 }
 
