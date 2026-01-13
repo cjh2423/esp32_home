@@ -106,6 +106,14 @@ static esp_err_t init_sr_models(void)
              s_wn_iface->get_samp_rate(s_wn_model),
              s_wn_iface->get_samp_chunksize(s_wn_model));
 
+    // 验证 AFE fetch chunksize 与 WakeNet chunksize 匹配
+    size_t afe_fetch = afe_processor_get_fetch_chunksize(s_afe);
+    int wn_chunk = s_wn_iface->get_samp_chunksize(s_wn_model);
+    if (afe_fetch != (size_t)wn_chunk) {
+        ESP_LOGW(TAG, "Chunksize mismatch: AFE fetch=%u, WakeNet=%d",
+                 (unsigned)afe_fetch, wn_chunk);
+    }
+
     // 加载 MultiNet 模型
     char *mn_name = esp_srmodel_filter(s_models, ESP_MN_PREFIX, SR_MULTINET_MODEL);
     if (mn_name == NULL) {
@@ -350,6 +358,20 @@ esp_err_t vr_stop(void)
     }
 
     s_task_handle = NULL;
+
+    // 重置状态机，确保下次启动从唤醒等待状态开始
+    s_state = VR_STATE_WAITING_WAKE;
+
+    // 重置 AFE 缓冲，清除残留数据
+    if (s_afe) {
+        afe_processor_reset(s_afe);
+    }
+
+    // 清理 MultiNet 状态
+    if (s_mn_iface && s_mn_model) {
+        s_mn_iface->clean(s_mn_model);
+    }
+
     return ESP_OK;
 }
 
