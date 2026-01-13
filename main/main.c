@@ -169,8 +169,8 @@ void app_main(void)
     xTaskCreate(system_task, "system_task", 4096, NULL, 5, NULL);
     
     // 5. 初始化语音识别 (Voice Recognition Layer)
-    if (vr_init(INMP441_I2S_SCK, INMP441_I2S_WS, INMP441_I2S_SD, 
-                (vr_command_callback_t)app_control_handle_voice_command) == ESP_OK) {
+    if (vr_init(INMP441_I2S_SCK, INMP441_I2S_WS, INMP441_I2S_SD,
+                app_control_handle_voice_command) == ESP_OK) {
         vr_start();
         ESP_LOGI(TAG, "Voice Recognition Started");
     } else {

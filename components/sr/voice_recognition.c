@@ -73,19 +73,19 @@ static esp_err_t init_sr_models(void)
     char *wn_name = esp_srmodel_filter(models, ESP_WN_PREFIX, SR_WAKENET_MODEL);
     if (wn_name == NULL) {
         ESP_LOGE(TAG, "Failed to find WakeNet model: %s", SR_WAKENET_MODEL);
-        return ESP_FAIL;
+        goto err_cleanup_models;
     }
 
     s_wn_iface = esp_wn_handle_from_name(wn_name);
     if (s_wn_iface == NULL) {
         ESP_LOGE(TAG, "Failed to get WakeNet interface");
-        return ESP_FAIL;
+        goto err_cleanup_models;
     }
 
     s_wn_model = s_wn_iface->create(wn_name, SR_WAKENET_MODE);
     if (s_wn_model == NULL) {
         ESP_LOGE(TAG, "Failed to create WakeNet model");
-        return ESP_FAIL;
+        goto err_cleanup_models;
     }
 
     ESP_LOGI(TAG, "WakeNet ready (SR: %d Hz, Chunk: %d)",
@@ -96,19 +96,19 @@ static esp_err_t init_sr_models(void)
     char *mn_name = esp_srmodel_filter(models, ESP_MN_PREFIX, SR_MULTINET_MODEL);
     if (mn_name == NULL) {
         ESP_LOGE(TAG, "Failed to find MultiNet model: %s", SR_MULTINET_MODEL);
-        return ESP_FAIL;
+        goto err_cleanup_wn;
     }
 
     s_mn_iface = esp_mn_handle_from_name(mn_name);
     if (s_mn_iface == NULL) {
         ESP_LOGE(TAG, "Failed to get MultiNet interface");
-        return ESP_FAIL;
+        goto err_cleanup_wn;
     }
 
     s_mn_model = s_mn_iface->create(mn_name, 5000);
     if (s_mn_model == NULL) {
         ESP_LOGE(TAG, "Failed to create MultiNet model");
-        return ESP_FAIL;
+        goto err_cleanup_wn;
     }
 
     // 注册自定义命令
@@ -116,15 +116,30 @@ static esp_err_t init_sr_models(void)
     for (int i = 0; i < NUM_COMMANDS; i++) {
         esp_mn_commands_add(i + 1, (char *)s_commands[i]);
     }
-    
+
     esp_mn_error_t *err = esp_mn_commands_update();
     if (err) {
         ESP_LOGE(TAG, "Failed to update commands");
-        return ESP_FAIL;
+        goto err_cleanup_mn;
     }
 
     ESP_LOGI(TAG, "MultiNet ready (%d commands)", NUM_COMMANDS);
+    // 注意：models 列表由 esp-sr 内部管理，不需要手动释放
     return ESP_OK;
+
+err_cleanup_mn:
+    if (s_mn_iface && s_mn_model) {
+        s_mn_iface->destroy(s_mn_model);
+        s_mn_model = NULL;
+    }
+err_cleanup_wn:
+    if (s_wn_iface && s_wn_model) {
+        s_wn_iface->destroy(s_wn_model);
+        s_wn_model = NULL;
+    }
+err_cleanup_models:
+    // esp_srmodel_deinit(models); // 如果 esp-sr 提供此 API
+    return ESP_FAIL;
 }
 
 /**
