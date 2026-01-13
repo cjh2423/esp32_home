@@ -76,7 +76,7 @@ static void system_task(void *pvParameters)
         
         // 读取 BH1750 (仅当初始化成功)
         if (bh1750_ok) {
-            if (bh1750_read(I2C_NUM_0, &lux) == ESP_OK) {
+            if (bh1750_read(&lux) == ESP_OK) {
                 lux_valid = true;
             } else {
                 lux_valid = false;
@@ -132,7 +132,7 @@ void app_main(void)
         ESP_LOGE(TAG, "DHT11 Init Failed");
     }
     
-    if (bh1750_init(I2C_NUM_0, BH1750_SDA_GPIO, BH1750_SCL_GPIO) == ESP_OK) {
+    if (bh1750_init(BH1750_SDA_GPIO, BH1750_SCL_GPIO) == ESP_OK) {
         bh1750_ok = true;
     } else {
         ESP_LOGE(TAG, "BH1750 Init Failed (SDA: %d, SCL: %d)", BH1750_SDA_GPIO, BH1750_SCL_GPIO);

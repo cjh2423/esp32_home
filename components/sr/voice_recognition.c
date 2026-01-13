@@ -272,6 +272,9 @@ static void vr_detect_task(void *arg)
                 esp_mn_state_t mn_state = s_mn_iface->detect(s_mn_model, mn_accum);
                 mn_accum_len = 0;
 
+                // 让出 CPU，避免看门狗超时
+                taskYIELD();
+
                 if (mn_state == ESP_MN_STATE_DETECTED) {
                     esp_mn_results_t *mn_result = s_mn_iface->get_results(s_mn_model);
                     if (mn_result && mn_result->num > 0) {

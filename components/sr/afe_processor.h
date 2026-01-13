@@ -54,7 +54,7 @@ typedef struct {
  * @brief 默认 AFE 配置 (启用 WakeNet，参考 xiaozhi)
  */
 #define AFE_PROCESSOR_CONFIG_DEFAULT() { \
-    .enable_ns = true,                   \
+    .enable_ns = false,                   \
     .enable_vad = true,                  \
     .enable_wakenet = true,              \
     .enable_agc = false,                 \
