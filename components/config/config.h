@@ -81,7 +81,7 @@
 #define LIGHT_HYSTERESIS 20.0f      // 光照滞回值 (lux)
 
 // 烟雾阈值 (ADC原始值 0-4095)
-#define SMOKE_THRESHOLD 1000
+#define SMOKE_THRESHOLD 2500
 
 // 蜂鸣器配置
 #define BUZZER_BEEP_DURATION_MS 200  // 蜂鸣器报警时长(毫秒)
