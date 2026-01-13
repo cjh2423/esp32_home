@@ -49,6 +49,8 @@ typedef enum {
 } vr_state_t;
 
 static vr_state_t s_state = VR_STATE_WAITING_WAKE;
+static int s_wn_chunk = 0;
+static int s_mn_chunk = 0;
 
 /**
  * @brief 将命令 ID 映射为枚举
@@ -102,16 +104,24 @@ static esp_err_t init_sr_models(void)
         goto err_cleanup_afe;
     }
 
+    s_wn_chunk = s_wn_iface->get_samp_chunksize(s_wn_model);
+    if (s_wn_chunk <= 0) {
+        ESP_LOGE(TAG, "Invalid WakeNet chunk size: %d", s_wn_chunk);
+        goto err_cleanup_wn;
+    }
+
     ESP_LOGI(TAG, "WakeNet ready (SR: %d Hz, Chunk: %d)",
-             s_wn_iface->get_samp_rate(s_wn_model),
-             s_wn_iface->get_samp_chunksize(s_wn_model));
+             s_wn_iface->get_samp_rate(s_wn_model), s_wn_chunk);
 
     // 验证 AFE fetch chunksize 与 WakeNet chunksize 匹配
     size_t afe_fetch = afe_processor_get_fetch_chunksize(s_afe);
-    int wn_chunk = s_wn_iface->get_samp_chunksize(s_wn_model);
-    if (afe_fetch != (size_t)wn_chunk) {
+    if (afe_fetch == 0) {
+        ESP_LOGE(TAG, "AFE fetch chunksize invalid");
+        goto err_cleanup_wn;
+    }
+    if (afe_fetch != (size_t)s_wn_chunk) {
         ESP_LOGW(TAG, "Chunksize mismatch: AFE fetch=%u, WakeNet=%d",
-                 (unsigned)afe_fetch, wn_chunk);
+                 (unsigned)afe_fetch, s_wn_chunk);
     }
 
     // 加载 MultiNet 模型
@@ -131,6 +141,11 @@ static esp_err_t init_sr_models(void)
     if (s_mn_model == NULL) {
         ESP_LOGE(TAG, "Failed to create MultiNet model");
         goto err_cleanup_wn;
+    }
+    s_mn_chunk = s_mn_iface->get_samp_chunksize(s_mn_model);
+    if (s_mn_chunk <= 0) {
+        ESP_LOGE(TAG, "Invalid MultiNet chunk size: %d", s_mn_chunk);
+        goto err_cleanup_mn;
     }
 
     // 注册自定义命令
@@ -166,6 +181,8 @@ err_cleanup_afe:
 err_cleanup_models:
     // 模型列表由 SDK 管理
     s_models = NULL;
+    s_wn_chunk = 0;
+    s_mn_chunk = 0;
     return ESP_FAIL;
 }
 
@@ -185,6 +202,7 @@ static void vr_task(void *arg)
     if (i2s_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate I2S buffer");
         s_task_running = false;
+        s_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -195,11 +213,51 @@ static void vr_task(void *arg)
         ESP_LOGE(TAG, "Failed to allocate audio buffer");
         free(i2s_buffer);
         s_task_running = false;
+        s_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
 
+    if (s_wn_chunk <= 0 || s_mn_chunk <= 0 || fetch_chunksize == 0) {
+        ESP_LOGE(TAG, "Invalid chunk size (wn:%d mn:%d fetch:%u)",
+                 s_wn_chunk, s_mn_chunk, (unsigned)fetch_chunksize);
+        free(audio_buffer);
+        free(i2s_buffer);
+        s_task_running = false;
+        s_task_handle = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    int16_t *wn_accum = (int16_t *)malloc((size_t)s_wn_chunk * sizeof(int16_t));
+    if (wn_accum == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate WakeNet buffer");
+        free(audio_buffer);
+        free(i2s_buffer);
+        s_task_running = false;
+        s_task_handle = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    int16_t *mn_accum = (int16_t *)malloc((size_t)s_mn_chunk * sizeof(int16_t));
+    if (mn_accum == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate MultiNet buffer");
+        free(wn_accum);
+        free(audio_buffer);
+        free(i2s_buffer);
+        s_task_running = false;
+        s_task_handle = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    size_t wn_accum_len = 0;
+    size_t mn_accum_len = 0;
+
     while (s_task_running) {
+        // 让出 CPU，避免长期占用导致 Idle 任务被饿死触发 WDT
+        vTaskDelay(pdMS_TO_TICKS(1));
         size_t bytes_read = 0;
 
         // 从 INMP441 读取数据 (使用短超时以便检查停止标志)
@@ -230,55 +288,99 @@ static void vr_task(void *arg)
             continue;  // 超时或无数据
         }
 
-        // 仅在 VAD 检测到语音时进行识别 (节省 CPU)
-        if (vad_state == AFE_VAD_SILENCE && s_state == VR_STATE_WAITING_WAKE) {
-            continue;  // 静音时跳过唤醒词检测
-        }
+        // 注意: 不再使用 VAD 预过滤跳过唤醒词检测
+        // WakeNet 本身有内置能量检测，不需要额外 VAD 门控
+        // VAD 状态仍可用于其他用途（如日志或统计）
 
         // 根据状态处理音频
         if (s_state == VR_STATE_WAITING_WAKE) {
-            wakenet_state_t wn_state = s_wn_iface->detect(s_wn_model, afe_output);
+            size_t offset = 0;
+            while (offset < fetch_chunksize) {
+                size_t remaining = fetch_chunksize - offset;
+                size_t need = (size_t)s_wn_chunk - wn_accum_len;
+                size_t to_copy = remaining < need ? remaining : need;
 
-            if (wn_state > 0) {
-                ESP_LOGI(TAG, "Wake word detected!");
-                s_state = VR_STATE_WAITING_COMMAND;
-                s_mn_iface->clean(s_mn_model);
+                memcpy(wn_accum + wn_accum_len, afe_output + offset, to_copy * sizeof(int16_t));
+                wn_accum_len += to_copy;
+                offset += to_copy;
 
-                if (s_callback) {
-                    s_callback(VR_CMD_WAKE_UP);
+                if (wn_accum_len < (size_t)s_wn_chunk) {
+                    break;
+                }
+
+                wakenet_state_t wn_state = s_wn_iface->detect(s_wn_model, wn_accum);
+                wn_accum_len = 0;
+
+                if (wn_state > 0) {
+                    ESP_LOGI(TAG, "Wake word detected!");
+                    s_state = VR_STATE_WAITING_COMMAND;
+                    mn_accum_len = 0;
+                    s_mn_iface->clean(s_mn_model);
+
+                    if (s_callback) {
+                        s_callback(VR_CMD_WAKE_UP);
+                    }
+                    break;
                 }
             }
         }
         else if (s_state == VR_STATE_WAITING_COMMAND) {
-            esp_mn_state_t mn_state = s_mn_iface->detect(s_mn_model, afe_output);
+            size_t offset = 0;
+            while (offset < fetch_chunksize) {
+                size_t remaining = fetch_chunksize - offset;
+                size_t need = (size_t)s_mn_chunk - mn_accum_len;
+                size_t to_copy = remaining < need ? remaining : need;
 
-            if (mn_state == ESP_MN_STATE_DETECTED) {
-                esp_mn_results_t *result = s_mn_iface->get_results(s_mn_model);
-                if (result && result->num > 0) {
-                    int cmd_id = result->phrase_id[0];
-                    ESP_LOGI(TAG, "Command detected: ID %d", cmd_id);
+                memcpy(mn_accum + mn_accum_len, afe_output + offset, to_copy * sizeof(int16_t));
+                mn_accum_len += to_copy;
+                offset += to_copy;
 
-                    vr_command_t cmd = map_command_id(cmd_id);
-                    if (s_callback && cmd != VR_CMD_UNKNOWN) {
-                        s_callback(cmd);
-                    }
-
-                    s_mn_iface->clean(s_mn_model);
+                if (mn_accum_len < (size_t)s_mn_chunk) {
+                    break;
                 }
-                // 命令识别成功后返回唤醒等待状态
-                s_state = VR_STATE_WAITING_WAKE;
-            }
-            else if (mn_state == ESP_MN_STATE_TIMEOUT) {
-                ESP_LOGI(TAG, "Command timeout, back to wake mode");
-                s_state = VR_STATE_WAITING_WAKE;
+
+                esp_mn_state_t mn_state = s_mn_iface->detect(s_mn_model, mn_accum);
+                mn_accum_len = 0;
+
+                // MultiNet 检测后让出 CPU，避免长时间占用触发 WDT
+                taskYIELD();
+
+                if (mn_state == ESP_MN_STATE_DETECTED) {
+                    esp_mn_results_t *result = s_mn_iface->get_results(s_mn_model);
+                    if (result && result->num > 0) {
+                        int cmd_id = result->phrase_id[0];
+                        ESP_LOGI(TAG, "Command detected: ID %d", cmd_id);
+
+                        vr_command_t cmd = map_command_id(cmd_id);
+                        if (s_callback && cmd != VR_CMD_UNKNOWN) {
+                            s_callback(cmd);
+                        }
+
+                        s_mn_iface->clean(s_mn_model);
+                    }
+                    // 命令识别成功后返回唤醒等待状态
+                    s_state = VR_STATE_WAITING_WAKE;
+                    wn_accum_len = 0;
+                    break;
+                } else if (mn_state == ESP_MN_STATE_TIMEOUT) {
+                    ESP_LOGI(TAG, "Command timeout, back to wake mode");
+                    s_state = VR_STATE_WAITING_WAKE;
+                    s_mn_iface->clean(s_mn_model);
+                    wn_accum_len = 0;
+                    break;
+                }
             }
         }
+
     }
 
     // 清理资源
+    free(mn_accum);
+    free(wn_accum);
     free(audio_buffer);
     free(i2s_buffer);
     ESP_LOGI(TAG, "Task stopped");
+    s_task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -351,13 +453,7 @@ esp_err_t vr_stop(void)
     // 等待任务退出 (最多 500ms)
     for (int i = 0; i < 50 && s_task_handle != NULL; i++) {
         vTaskDelay(pdMS_TO_TICKS(10));
-        // 检查任务是否已删除自己
-        if (eTaskGetState(s_task_handle) == eDeleted) {
-            break;
-        }
     }
-
-    s_task_handle = NULL;
 
     // 重置状态机，确保下次启动从唤醒等待状态开始
     s_state = VR_STATE_WAITING_WAKE;
@@ -395,6 +491,8 @@ esp_err_t vr_deinit(void)
     }
 
     s_models = NULL;
+    s_wn_chunk = 0;
+    s_mn_chunk = 0;
 
     inmp441_deinit();
 

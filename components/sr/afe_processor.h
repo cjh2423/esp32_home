@@ -45,6 +45,15 @@ typedef void (*afe_vad_callback_t)(bool speaking);
 typedef struct afe_processor* afe_processor_handle_t;
 
 /**
+ * @brief VAD 灵敏度模式
+ *
+ * VAD_MODE_0: 最不敏感 (高阈值，减少误触发)
+ * VAD_MODE_4: 最敏感 (低阈值，更容易检测到语音)
+ */
+#define AFE_VAD_MODE_LEAST_SENSITIVE  VAD_MODE_0
+#define AFE_VAD_MODE_MOST_SENSITIVE   VAD_MODE_4
+
+/**
  * @brief AFE 配置结构
  */
 typedef struct {
@@ -52,16 +61,20 @@ typedef struct {
     bool enable_vad;        // 启用 VAD
     bool enable_agc;        // 启用 AGC (通常关闭)
     bool use_psram;         // 使用 PSRAM 分配内存
+    int vad_mode;           // VAD 灵敏度模式 (VAD_MODE_0 ~ VAD_MODE_4)
+    int vad_min_noise_ms;   // VAD 最小静音时间 (ms)
 } afe_processor_config_t;
 
 /**
  * @brief 默认 AFE 配置
  */
 #define AFE_PROCESSOR_CONFIG_DEFAULT() { \
-    .enable_ns = true,      \
-    .enable_vad = true,     \
-    .enable_agc = false,    \
-    .use_psram = true       \
+    .enable_ns = true,                   \
+    .enable_vad = true,                  \
+    .enable_agc = false,                 \
+    .use_psram = true,                   \
+    .vad_mode = AFE_VAD_MODE_MOST_SENSITIVE, \
+    .vad_min_noise_ms = 50               \
 }
 
 /**

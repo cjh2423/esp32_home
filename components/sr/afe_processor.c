@@ -7,6 +7,7 @@
 
 #include "afe_processor.h"
 #include "esp_log.h"
+#include "esp_afe_config.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -79,10 +80,10 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
     // AEC 配置 - 无扬声器，禁用 AEC
     afe_config->aec_init = false;
 
-    // VAD 配置
+    // VAD 配置 - 使用配置结构体中的参数
     afe_config->vad_init = config->enable_vad;
-    afe_config->vad_mode = VAD_MODE_0;
-    afe_config->vad_min_noise_ms = 100;
+    afe_config->vad_mode = config->vad_mode;
+    afe_config->vad_min_noise_ms = config->vad_min_noise_ms;
     if (vad_model_name != NULL) {
         afe_config->vad_model_name = vad_model_name;
     }
@@ -129,9 +130,13 @@ afe_processor_handle_t afe_processor_create(const afe_processor_config_t *config
              ns_model_name ? "ON" : "OFF",
              config->enable_vad ? "ON" : "OFF");
 
+    afe_config_free(afe_config);
     return handle;
 
 err_cleanup:
+    if (afe_config) {
+        afe_config_free(afe_config);
+    }
     if (handle->models_owned && handle->models) {
         // esp_srmodel_deinit 不存在，模型列表由 SDK 管理
     }
