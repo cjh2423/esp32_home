@@ -30,6 +30,7 @@ static const char *s_commands[] = {
 // 全局变量
 static vr_command_callback_t s_callback = NULL;
 static TaskHandle_t s_task_handle = NULL;
+static volatile bool s_task_running = false;  // 任务运行标志
 
 // ESP-SR 模型句柄
 static srmodel_list_t *s_models = NULL;
@@ -175,6 +176,7 @@ static void vr_task(void *arg)
     int32_t *i2s_buffer = (int32_t *)malloc(feed_chunksize * sizeof(int32_t));
     if (i2s_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate I2S buffer");
+        s_task_running = false;
         vTaskDelete(NULL);
         return;
     }
@@ -184,16 +186,20 @@ static void vr_task(void *arg)
     if (audio_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate audio buffer");
         free(i2s_buffer);
+        s_task_running = false;
         vTaskDelete(NULL);
         return;
     }
 
-    while (1) {
+    while (s_task_running) {
         size_t bytes_read = 0;
 
-        // 从 INMP441 读取数据
+        // 从 INMP441 读取数据 (使用短超时以便检查停止标志)
         esp_err_t ret = inmp441_read(i2s_buffer, feed_chunksize * sizeof(int32_t),
-                                      &bytes_read, portMAX_DELAY);
+                                      &bytes_read, 100);
+        if (ret == ESP_ERR_TIMEOUT) {
+            continue;  // 超时，检查停止标志
+        }
         if (ret != ESP_OK || bytes_read != feed_chunksize * sizeof(int32_t)) {
             ESP_LOGW(TAG, "I2S read failed or incomplete");
             continue;
@@ -251,6 +257,8 @@ static void vr_task(void *arg)
 
                     s_mn_iface->clean(s_mn_model);
                 }
+                // 命令识别成功后返回唤醒等待状态
+                s_state = VR_STATE_WAITING_WAKE;
             }
             else if (mn_state == ESP_MN_STATE_TIMEOUT) {
                 ESP_LOGI(TAG, "Command timeout, back to wake mode");
@@ -259,8 +267,10 @@ static void vr_task(void *arg)
         }
     }
 
+    // 清理资源
     free(audio_buffer);
     free(i2s_buffer);
+    ESP_LOGI(TAG, "Task stopped");
     vTaskDelete(NULL);
 }
 
@@ -299,6 +309,9 @@ esp_err_t vr_start(void)
         return ESP_OK;
     }
 
+    s_task_running = true;
+    s_state = VR_STATE_WAITING_WAKE;
+
     BaseType_t ret = xTaskCreatePinnedToCore(
         vr_task,
         "vr_task",
@@ -311,6 +324,7 @@ esp_err_t vr_start(void)
 
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create task");
+        s_task_running = false;
         return ESP_FAIL;
     }
 
@@ -319,10 +333,23 @@ esp_err_t vr_start(void)
 
 esp_err_t vr_stop(void)
 {
-    if (s_task_handle) {
-        vTaskDelete(s_task_handle);
-        s_task_handle = NULL;
+    if (s_task_handle == NULL) {
+        return ESP_OK;
     }
+
+    // 设置停止标志，等待任务自行退出
+    s_task_running = false;
+
+    // 等待任务退出 (最多 500ms)
+    for (int i = 0; i < 50 && s_task_handle != NULL; i++) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        // 检查任务是否已删除自己
+        if (eTaskGetState(s_task_handle) == eDeleted) {
+            break;
+        }
+    }
+
+    s_task_handle = NULL;
     return ESP_OK;
 }
 
