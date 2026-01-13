@@ -1,0 +1,3 @@
+dependencies:
+  # 依赖esp-sr组件
+  espressif/esp-sr: "^2.3.0"

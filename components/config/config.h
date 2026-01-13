@@ -51,6 +51,19 @@
 #define FAN_PWM_FREQ 25000
 #define FAN_PWM_RESOLUTION 8
 
+// 9. INMP441 麦克风 (I2S - 语音识别)
+#define INMP441_I2S_SCK  40  // I2S 时钟引脚
+#define INMP441_I2S_WS   41  // I2S 字选择引脚
+#define INMP441_I2S_SD   42  // I2S 数据引脚
+
+// ==================== 语音识别配置 ====================
+// 唤醒词模型 (可选: wn9_hilexin, wn9_nihaoxiaozhi)
+#define SR_WAKENET_MODEL "wn9_nihaoxiaozhi"
+// 命令词模型
+#define SR_MULTINET_MODEL "mn7_cn"
+// 唤醒灵敏度 (DET_MODE_90, DET_MODE_95)
+#define SR_WAKENET_MODE DET_MODE_95
+
 // ==================== 传感器阈值配置 ====================
 // 温度阈值
 #define TEMP_HIGH_THRESHOLD 30.0f   // 高温阈值（℃）- 风扇低速

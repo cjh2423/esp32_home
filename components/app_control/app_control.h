@@ -19,4 +19,11 @@ esp_err_t app_control_init(void);
  */
 void app_control_process(sensor_data_t *data);
 
+/**
+ * @brief 处理语音命令
+ * 
+ * @param command 语音命令枚举值
+ */
+void app_control_handle_voice_command(int command);
+
 #endif // APP_CONTROL_H

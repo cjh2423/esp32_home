@@ -21,6 +21,7 @@
 #include "fan.h"
 #include "motor.h"
 #include "buzzer.h"
+#include "voice_recognition.h"
 
 static const char *TAG = "MAIN";
 
@@ -166,6 +167,15 @@ void app_main(void)
     
     // 4. 启动主业务任务 (Application Layer)
     xTaskCreate(system_task, "system_task", 4096, NULL, 5, NULL);
+    
+    // 5. 初始化语音识别 (Voice Recognition Layer)
+    if (vr_init(INMP441_I2S_SCK, INMP441_I2S_WS, INMP441_I2S_SD, 
+                (vr_command_callback_t)app_control_handle_voice_command) == ESP_OK) {
+        vr_start();
+        ESP_LOGI(TAG, "Voice Recognition Started");
+    } else {
+        ESP_LOGW(TAG, "Voice Recognition Init Failed");
+    }
     
     ESP_LOGI(TAG, "System Initialized Successfully");
 }

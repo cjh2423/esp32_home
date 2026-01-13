@@ -1,4 +1,5 @@
 #include "app_control.h"
+#include "app_state.h"
 #include "esp_log.h"
 #include "config.h"
 // 引入硬件驱动
@@ -137,3 +138,55 @@ void app_control_process(sensor_data_t *data)
         led_set_brightness(LED_PWM_CHANNEL, led_brightness);
     }
 }
+
+void app_control_handle_voice_command(int command)
+{
+    sensor_data_t *data = app_state_get();
+    if (data == NULL) return;
+
+    app_state_lock();
+    
+    switch (command) {
+        case 0: // VR_CMD_WAKE_UP
+            ESP_LOGI(TAG, "Voice: Wake up detected");
+            buzzer_beep(BUZZER_GPIO, 100);
+            break;
+            
+        case 1: // VR_CMD_LIGHT_ON
+            ESP_LOGI(TAG, "Voice: Turn on light");
+            data->led_state = 1;
+            data->led_brightness = LED_BRIGHTNESS_MAX;
+            led_set_brightness(LED_PWM_CHANNEL, LED_BRIGHTNESS_MAX);
+            break;
+            
+        case 2: // VR_CMD_LIGHT_OFF
+            ESP_LOGI(TAG, "Voice: Turn off light");
+            data->led_state = 0;
+            data->led_brightness = LED_BRIGHTNESS_OFF;
+            led_off(LED_PWM_CHANNEL);
+            break;
+            
+        case 3: // VR_CMD_FAN_ON
+            ESP_LOGI(TAG, "Voice: Turn on fan");
+            data->fan_state = 1;
+            data->fan_speed = FAN_SPEED_MEDIUM;
+            fan_set_speed(FAN_SPEED_MEDIUM);
+            hysteresis_state.fan_on = true;
+            break;
+            
+        case 4: // VR_CMD_FAN_OFF
+            ESP_LOGI(TAG, "Voice: Turn off fan");
+            data->fan_state = 0;
+            data->fan_speed = FAN_SPEED_OFF;
+            fan_set_speed(FAN_SPEED_OFF);
+            hysteresis_state.fan_on = false;
+            break;
+            
+        default:
+            ESP_LOGW(TAG, "Unknown voice command: %d", command);
+            break;
+    }
+    
+    app_state_unlock();
+}
+
