@@ -6,7 +6,7 @@
 // 引入硬件驱动
 #include "led.h"
 #include "fan.h"
-#include "motor.h"
+#include "servo_driver.h"  // 使用 espressif/servo 官方组件
 #include "buzzer.h"
 #include "mq2.h" // 需要用到 mq2_is_smoke_detected
 #include "rgb_led.h"

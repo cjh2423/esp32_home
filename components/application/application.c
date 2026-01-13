@@ -44,13 +44,14 @@
 #include "wifi.h"
 #include "http_server.h"
 
-// 硬件驱动
-#include "dht11.h"
-#include "bh1750.h"
+// 硬件驱动 (使用官方组件封装)
+#include "dht_driver.h"      // esp-idf-lib/dht
+#include "bh1750_driver.h"   // esp-idf-lib/bh1750
+#include "servo_driver.h"    // espressif/servo
+// 保留原有驱动
 #include "mq2.h"
 #include "led.h"
 #include "fan.h"
-#include "motor.h"
 #include "buzzer.h"
 #include "rgb_led.h"
 #include "voice_recognition.h"
@@ -204,7 +205,7 @@ static esp_err_t init_hardware(void)
         ESP_LOGW(TAG, "  DHT11: FAILED");
     }
 
-    if (bh1750_init(BH1750_SDA_GPIO, BH1750_SCL_GPIO) == ESP_OK) {
+    if (bh1750_sensor_init(BH1750_SDA_GPIO, BH1750_SCL_GPIO) == ESP_OK) {
         s_init_status.bh1750_ok = true;
         ESP_LOGI(TAG, "  BH1750: OK (SDA=%d, SCL=%d)", BH1750_SDA_GPIO, BH1750_SCL_GPIO);
     } else {
@@ -385,7 +386,7 @@ static void sensor_task(void *pvParameters)
 
         // 读取 BH1750
         if (s_init_status.bh1750_ok) {
-            if (bh1750_read(&lux) == ESP_OK) {
+            if (bh1750_sensor_read(&lux) == ESP_OK) {
                 if (app_state_lock() == ESP_OK) {
                     sensor_data->light = lux;
                     app_state_unlock();
