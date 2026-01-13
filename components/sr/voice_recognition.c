@@ -1,5 +1,6 @@
 #include "voice_recognition.h"
 #include "inmp441_driver.h"
+#include "afe_processor.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -31,10 +32,14 @@ static vr_command_callback_t s_callback = NULL;
 static TaskHandle_t s_task_handle = NULL;
 
 // ESP-SR 模型句柄
+static srmodel_list_t *s_models = NULL;
 static const esp_wn_iface_t *s_wn_iface = NULL;
 static model_iface_data_t *s_wn_model = NULL;
 static const esp_mn_iface_t *s_mn_iface = NULL;
 static model_iface_data_t *s_mn_model = NULL;
+
+// AFE 处理器
+static afe_processor_handle_t s_afe = NULL;
 
 // 状态管理
 typedef enum {
@@ -63,29 +68,37 @@ static vr_command_t map_command_id(int id)
  */
 static esp_err_t init_sr_models(void)
 {
-    srmodel_list_t *models = esp_srmodel_init("model");
-    if (models == NULL) {
+    s_models = esp_srmodel_init("model");
+    if (s_models == NULL) {
         ESP_LOGE(TAG, "Failed to init SR model list");
         return ESP_FAIL;
     }
 
+    // 创建 AFE 处理器 (NS + VAD)
+    afe_processor_config_t afe_cfg = AFE_PROCESSOR_CONFIG_DEFAULT();
+    s_afe = afe_processor_create(&afe_cfg, s_models);
+    if (s_afe == NULL) {
+        ESP_LOGE(TAG, "Failed to create AFE processor");
+        goto err_cleanup_models;
+    }
+
     // 加载 WakeNet 模型
-    char *wn_name = esp_srmodel_filter(models, ESP_WN_PREFIX, SR_WAKENET_MODEL);
+    char *wn_name = esp_srmodel_filter(s_models, ESP_WN_PREFIX, SR_WAKENET_MODEL);
     if (wn_name == NULL) {
         ESP_LOGE(TAG, "Failed to find WakeNet model: %s", SR_WAKENET_MODEL);
-        goto err_cleanup_models;
+        goto err_cleanup_afe;
     }
 
     s_wn_iface = esp_wn_handle_from_name(wn_name);
     if (s_wn_iface == NULL) {
         ESP_LOGE(TAG, "Failed to get WakeNet interface");
-        goto err_cleanup_models;
+        goto err_cleanup_afe;
     }
 
     s_wn_model = s_wn_iface->create(wn_name, SR_WAKENET_MODE);
     if (s_wn_model == NULL) {
         ESP_LOGE(TAG, "Failed to create WakeNet model");
-        goto err_cleanup_models;
+        goto err_cleanup_afe;
     }
 
     ESP_LOGI(TAG, "WakeNet ready (SR: %d Hz, Chunk: %d)",
@@ -93,7 +106,7 @@ static esp_err_t init_sr_models(void)
              s_wn_iface->get_samp_chunksize(s_wn_model));
 
     // 加载 MultiNet 模型
-    char *mn_name = esp_srmodel_filter(models, ESP_MN_PREFIX, SR_MULTINET_MODEL);
+    char *mn_name = esp_srmodel_filter(s_models, ESP_MN_PREFIX, SR_MULTINET_MODEL);
     if (mn_name == NULL) {
         ESP_LOGE(TAG, "Failed to find MultiNet model: %s", SR_MULTINET_MODEL);
         goto err_cleanup_wn;
@@ -123,8 +136,7 @@ static esp_err_t init_sr_models(void)
         goto err_cleanup_mn;
     }
 
-    ESP_LOGI(TAG, "MultiNet ready (%d commands)", NUM_COMMANDS);
-    // 注意：models 列表由 esp-sr 内部管理，不需要手动释放
+    ESP_LOGI(TAG, "MultiNet ready (%d commands)", (int)NUM_COMMANDS);
     return ESP_OK;
 
 err_cleanup_mn:
@@ -137,84 +149,109 @@ err_cleanup_wn:
         s_wn_iface->destroy(s_wn_model);
         s_wn_model = NULL;
     }
+err_cleanup_afe:
+    if (s_afe) {
+        afe_processor_destroy(s_afe);
+        s_afe = NULL;
+    }
 err_cleanup_models:
-    // esp_srmodel_deinit(models); // 如果 esp-sr 提供此 API
+    // 模型列表由 SDK 管理
+    s_models = NULL;
     return ESP_FAIL;
 }
 
 /**
- * @brief 语音识别主任务
+ * @brief 语音识别主任务 (使用 AFE 前端处理)
  */
 static void vr_task(void *arg)
 {
-    int chunk_size = s_wn_iface->get_samp_chunksize(s_wn_model);
-    int chunk_bytes = chunk_size * sizeof(int16_t);
+    size_t feed_chunksize = afe_processor_get_feed_chunksize(s_afe);
+    size_t fetch_chunksize = afe_processor_get_fetch_chunksize(s_afe);
 
-    // 分配音频缓冲区
-    int16_t *audio_buffer = (int16_t *)malloc(chunk_bytes);
-    if (audio_buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate audio buffer");
-        vTaskDelete(NULL);
-        return;
-    }
+    ESP_LOGI(TAG, "Task started (AFE feed: %u, fetch: %u)",
+             (unsigned)feed_chunksize, (unsigned)fetch_chunksize);
 
-    // 由于 INMP441 输出 32 位数据，需要临时缓冲区
-    int32_t *i2s_buffer = (int32_t *)malloc(chunk_size * sizeof(int32_t));
+    // 分配 I2S 读取缓冲区 (32-bit from INMP441)
+    int32_t *i2s_buffer = (int32_t *)malloc(feed_chunksize * sizeof(int32_t));
     if (i2s_buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate I2S buffer");
-        free(audio_buffer);
         vTaskDelete(NULL);
         return;
     }
 
-    ESP_LOGI(TAG, "Task started");
+    // 分配 16-bit 音频缓冲区供 AFE feed
+    int16_t *audio_buffer = (int16_t *)malloc(feed_chunksize * sizeof(int16_t));
+    if (audio_buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate audio buffer");
+        free(i2s_buffer);
+        vTaskDelete(NULL);
+        return;
+    }
 
     while (1) {
         size_t bytes_read = 0;
-        
+
         // 从 INMP441 读取数据
-        esp_err_t ret = inmp441_read(i2s_buffer, chunk_size * sizeof(int32_t), &bytes_read, portMAX_DELAY);
-        if (ret != ESP_OK || bytes_read != chunk_size * sizeof(int32_t)) {
+        esp_err_t ret = inmp441_read(i2s_buffer, feed_chunksize * sizeof(int32_t),
+                                      &bytes_read, portMAX_DELAY);
+        if (ret != ESP_OK || bytes_read != feed_chunksize * sizeof(int32_t)) {
             ESP_LOGW(TAG, "I2S read failed or incomplete");
             continue;
         }
 
         // 转换 32 位数据到 16 位（INMP441 24 位数据存储在高 24 位）
-        for (int i = 0; i < chunk_size; i++) {
+        for (size_t i = 0; i < feed_chunksize; i++) {
             audio_buffer[i] = (int16_t)(i2s_buffer[i] >> 16);
+        }
+
+        // 喂入 AFE 处理器
+        afe_processor_feed(s_afe, audio_buffer);
+
+        // 获取 AFE 处理后的音频
+        int16_t *afe_output = NULL;
+        afe_vad_state_t vad_state = AFE_VAD_SILENCE;
+
+        ret = afe_processor_fetch(s_afe, &afe_output, &vad_state, 100);
+        if (ret != ESP_OK || afe_output == NULL) {
+            continue;  // 超时或无数据
+        }
+
+        // 仅在 VAD 检测到语音时进行识别 (节省 CPU)
+        if (vad_state == AFE_VAD_SILENCE && s_state == VR_STATE_WAITING_WAKE) {
+            continue;  // 静音时跳过唤醒词检测
         }
 
         // 根据状态处理音频
         if (s_state == VR_STATE_WAITING_WAKE) {
-            wakenet_state_t wn_state = s_wn_iface->detect(s_wn_model, audio_buffer);
-            
+            wakenet_state_t wn_state = s_wn_iface->detect(s_wn_model, afe_output);
+
             if (wn_state > 0) {
                 ESP_LOGI(TAG, "Wake word detected!");
                 s_state = VR_STATE_WAITING_COMMAND;
                 s_mn_iface->clean(s_mn_model);
-                
+
                 if (s_callback) {
                     s_callback(VR_CMD_WAKE_UP);
                 }
             }
-        } 
+        }
         else if (s_state == VR_STATE_WAITING_COMMAND) {
-            esp_mn_state_t mn_state = s_mn_iface->detect(s_mn_model, audio_buffer);
-            
+            esp_mn_state_t mn_state = s_mn_iface->detect(s_mn_model, afe_output);
+
             if (mn_state == ESP_MN_STATE_DETECTED) {
                 esp_mn_results_t *result = s_mn_iface->get_results(s_mn_model);
                 if (result && result->num > 0) {
                     int cmd_id = result->phrase_id[0];
                     ESP_LOGI(TAG, "Command detected: ID %d", cmd_id);
-                    
+
                     vr_command_t cmd = map_command_id(cmd_id);
                     if (s_callback && cmd != VR_CMD_UNKNOWN) {
                         s_callback(cmd);
                     }
-                    
+
                     s_mn_iface->clean(s_mn_model);
                 }
-            } 
+            }
             else if (mn_state == ESP_MN_STATE_TIMEOUT) {
                 ESP_LOGI(TAG, "Command timeout, back to wake mode");
                 s_state = VR_STATE_WAITING_WAKE;
@@ -292,19 +329,26 @@ esp_err_t vr_stop(void)
 esp_err_t vr_deinit(void)
 {
     vr_stop();
-    
+
     if (s_wn_iface && s_wn_model) {
         s_wn_iface->destroy(s_wn_model);
         s_wn_model = NULL;
     }
-    
+
     if (s_mn_iface && s_mn_model) {
         s_mn_iface->destroy(s_mn_model);
         s_mn_model = NULL;
     }
-    
+
+    if (s_afe) {
+        afe_processor_destroy(s_afe);
+        s_afe = NULL;
+    }
+
+    s_models = NULL;
+
     inmp441_deinit();
-    
+
     ESP_LOGI(TAG, "Voice recognition deinitialized");
     return ESP_OK;
 }
