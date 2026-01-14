@@ -14,8 +14,8 @@
 static const char *TAG = "APP_CTRL";
 
 // RGB LED 亮度配置
-#define RGB_BRIGHTNESS_BASE   20   // 基础亮度 (静音时)
-#define RGB_BRIGHTNESS_SPEECH 80   // 语音时亮度
+#define RGB_BRIGHTNESS_BASE   10   // 基础亮度 (静音时) - 降低以节能
+#define RGB_BRIGHTNESS_SPEECH 60   // 语音时亮度
 
 // 当前 RGB 颜色状态
 static rgb_color_t s_current_rgb_color = RGB_COLOR_OFF;
@@ -38,7 +38,10 @@ void app_control_process(sensor_data_t *data)
 {
     if (data == NULL) return;
 
-    // 1. 烟雾报警逻辑（安全优先）
+    // 检查控制模式 - 手动模式下跳过自动控制逻辑（烟雾报警除外）
+    bool is_auto_mode = (data->control_mode == CONTROL_MODE_AUTO);
+
+    // 1. 烟雾报警逻辑（安全优先 - 任何模式下都执行）
     uint8_t fan_speed = data->fan_speed;
     uint8_t fan_state = data->fan_state;
     if (mq2_is_smoke_detected(data->smoke, SMOKE_THRESHOLD)) {
@@ -48,8 +51,8 @@ void app_control_process(sensor_data_t *data)
         fan_speed = FAN_SPEED_HIGH;
         fan_state = 1;
         hysteresis_state.fan_on = true;
-    } else {
-        // 2. 无烟雾时的温度控制逻辑（带滞回）
+    } else if (is_auto_mode) {
+        // 2. 自动模式：温度控制逻辑（带滞回）
         if (AUTO_FAN_ENABLE) {
             float temp = data->temperature;
 
@@ -89,17 +92,14 @@ void app_control_process(sensor_data_t *data)
                     fan_state = 0;
                 }
             }
-        } else {
-            if (fan_state == 0) {
-                fan_speed = FAN_SPEED_OFF;
-            }
         }
     }
+    // 手动模式：保持用户设置的风扇状态，不自动调整
 
-    // 3. 灯光控制逻辑（带滞回）
+    // 3. 灯光控制逻辑（带滞回）- 仅自动模式
     uint8_t led_brightness = data->led_brightness;
     uint8_t led_state = data->led_state;
-    if (AUTO_LIGHT_ENABLE) {
+    if (is_auto_mode && AUTO_LIGHT_ENABLE) {
         float light = data->light;
 
         // 滞回逻辑
@@ -118,13 +118,8 @@ void app_control_process(sensor_data_t *data)
                 hysteresis_state.led_on = true;
             }
         }
-    } else {
-        if (led_state == 0) {
-            led_brightness = LED_BRIGHTNESS_OFF;
-        } else if (led_brightness == 0) {
-            led_brightness = LED_BRIGHTNESS_MAX;
-        }
     }
+    // 手动模式：保持用户设置的LED状态，不自动调整
 
     // 4. 窗帘控制逻辑
     static uint8_t last_curtain_state = 0;
@@ -145,6 +140,18 @@ void app_control_process(sensor_data_t *data)
         led_off(LED_PWM_CHANNEL);
     } else {
         led_set_brightness(LED_PWM_CHANNEL, led_brightness);
+    }
+}
+
+void app_control_set_mode(sensor_data_t *data, control_mode_t mode)
+{
+    if (data == NULL) return;
+
+    data->control_mode = mode;
+    if (mode == CONTROL_MODE_AUTO) {
+        // 切回自动模式时，同步滞回状态与当前设备状态
+        hysteresis_state.fan_on = (data->fan_state != 0);
+        hysteresis_state.led_on = (data->led_state != 0);
     }
 }
 
@@ -235,6 +242,18 @@ void app_control_handle_voice_command(vr_command_t command)
             curtain_control(0);
             break;
 
+        case VR_CMD_MODE_AUTO:
+            ESP_LOGI(TAG, "Voice: Switch to AUTO mode");
+            app_control_set_mode(data, CONTROL_MODE_AUTO);
+            buzzer_beep(BUZZER_GPIO, 50);  // 短提示音
+            break;
+
+        case VR_CMD_MODE_MANUAL:
+            ESP_LOGI(TAG, "Voice: Switch to MANUAL mode");
+            app_control_set_mode(data, CONTROL_MODE_MANUAL);
+            buzzer_beep(BUZZER_GPIO, 100);  // 长提示音区分
+            break;
+
         default:
             ESP_LOGW(TAG, "Unknown voice command: %d", command);
             break;
@@ -258,4 +277,3 @@ void app_control_handle_vad_state(vr_vad_state_t state)
     // 重新设置颜色以应用新亮度
     rgb_led_set_color(s_current_rgb_color);
 }
-

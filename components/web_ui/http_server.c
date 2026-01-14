@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "cJSON.h"
 #include "app_state.h"
+#include "app_control.h"
 #include "config.h"
 #include <string.h>
 #include <stdlib.h>
@@ -51,6 +52,7 @@ static esp_err_t api_data_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "fan_state", snapshot.fan_state);
     cJSON_AddNumberToObject(root, "fan_speed", snapshot.fan_speed);
     cJSON_AddNumberToObject(root, "curtain_state", snapshot.curtain_state);
+    cJSON_AddNumberToObject(root, "control_mode", snapshot.control_mode);
 
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str == NULL) {
@@ -163,6 +165,25 @@ static esp_err_t api_fan_speed_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+// 模式切换处理
+static esp_err_t api_mode_toggle_handler(httpd_req_t *req)
+{
+    if (g_sensor_data != NULL) {
+        if (app_state_lock() != ESP_OK) {
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        if (g_sensor_data->control_mode == CONTROL_MODE_AUTO) {
+            app_control_set_mode(g_sensor_data, CONTROL_MODE_MANUAL);
+        } else {
+            app_control_set_mode(g_sensor_data, CONTROL_MODE_AUTO);
+        }
+        app_state_unlock();
+    }
+    httpd_resp_send(req, "OK", 2);
+    return ESP_OK;
+}
+
 httpd_handle_t http_server_start(sensor_data_t *sensor_data)
 {
     g_sensor_data = sensor_data;
@@ -231,7 +252,15 @@ httpd_handle_t http_server_start(sensor_data_t *sensor_data)
             .user_ctx = NULL
         };
         httpd_register_uri_handler(server, &api_led_brightness_uri);
-        
+
+        httpd_uri_t api_mode_toggle_uri = {
+            .uri = "/api/mode/toggle",
+            .method = HTTP_GET,
+            .handler = api_mode_toggle_handler,
+            .user_ctx = NULL
+        };
+        httpd_register_uri_handler(server, &api_mode_toggle_uri);
+
         ESP_LOGI(TAG, "HTTP server started on port %d", config.server_port);
         return server;
     }

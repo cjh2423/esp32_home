@@ -21,6 +21,14 @@ esp_err_t app_control_init(void);
 void app_control_process(sensor_data_t *data);
 
 /**
+ * @brief 切换控制模式（调用方需持有 app_state 锁）
+ *
+ * @param data 指向全局传感器数据的指针
+ * @param mode 目标控制模式
+ */
+void app_control_set_mode(sensor_data_t *data, control_mode_t mode);
+
+/**
  * @brief 处理语音命令
  *
  * @param command 语音命令枚举值

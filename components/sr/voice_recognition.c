@@ -33,6 +33,8 @@ static const char *s_commands[] = {
     "lv se",                // ID 8: RGB 绿色
     "lan se",               // ID 9: RGB 蓝色
     "guan bi cai deng",     // ID 10: RGB 关闭
+    "zi dong mo shi",       // ID 11: 自动模式
+    "shou dong mo shi",     // ID 12: 手动模式
 };
 #define NUM_COMMANDS (sizeof(s_commands) / sizeof(s_commands[0]))
 
@@ -78,6 +80,8 @@ static vr_command_t map_command_id(int id)
         case 8: return VR_CMD_RGB_GREEN;
         case 9: return VR_CMD_RGB_BLUE;
         case 10: return VR_CMD_RGB_OFF;
+        case 11: return VR_CMD_MODE_AUTO;
+        case 12: return VR_CMD_MODE_MANUAL;
         default: return VR_CMD_UNKNOWN;
     }
 }

@@ -314,6 +314,21 @@ letter-spacing:1px;
 <div class="device">
 <div class="device-header">
 <div class="device-name">
+<div class="device-icon">⚙️</div>
+<span>控制模式</span>
+</div>
+<button class="toggle" id="modeToggle" onclick="toggleMode()"></button>
+</div>
+<div class="slider-wrap">
+<div class="slider-label">
+<span>当前模式</span>
+<span class="slider-value" id="modeStatus">自动</span>
+</div>
+</div>
+</div>
+<div class="device">
+<div class="device-header">
+<div class="device-name">
 <div class="device-icon">💡</div>
 <span>照明系统</span>
 </div>
@@ -387,11 +402,14 @@ document.getElementById('brightnessSlider').value=d.led_brightness;
 document.getElementById('fanSpeed').innerText=d.fan_speed;
 document.getElementById('fanSpeedSlider').value=d.fan_speed;
 document.getElementById('curtainStatus').innerText=d.curtain_state?'开启':'关闭';
+document.getElementById('modeToggle').className='toggle'+(d.control_mode===0?' on':'');
+document.getElementById('modeStatus').innerText=d.control_mode===0?'自动':'手动';
 }).catch(()=>{});
 }
 function toggleLED(){fetch('/api/led/toggle').then(updateData)}
 function toggleFan(){fetch('/api/fan/toggle').then(updateData)}
 function toggleCurtain(){fetch('/api/curtain/toggle').then(updateData)}
+function toggleMode(){fetch('/api/mode/toggle').then(updateData)}
 function setBrightness(v){fetch('/api/led/brightness?value='+v).then(updateData)}
 function setFanSpeed(v){fetch('/api/fan/speed?value='+v).then(updateData)}
 setInterval(updateData,2000);
