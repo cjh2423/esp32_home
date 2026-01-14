@@ -32,9 +32,8 @@ static const char *s_commands[] = {
     "hong se",              // ID 7: RGB 红色
     "lv se",                // ID 8: RGB 绿色
     "lan se",               // ID 9: RGB 蓝色
-    "guan bi cai deng",     // ID 10: RGB 关闭
-    "zi dong mo shi",       // ID 11: 自动模式
-    "shou dong mo shi",     // ID 12: 手动模式
+    "zi dong mo shi",       // ID 10: 自动模式
+    "shou dong mo shi",     // ID 11: 手动模式
 };
 #define NUM_COMMANDS (sizeof(s_commands) / sizeof(s_commands[0]))
 
@@ -79,9 +78,8 @@ static vr_command_t map_command_id(int id)
         case 7: return VR_CMD_RGB_RED;
         case 8: return VR_CMD_RGB_GREEN;
         case 9: return VR_CMD_RGB_BLUE;
-        case 10: return VR_CMD_RGB_OFF;
-        case 11: return VR_CMD_MODE_AUTO;
-        case 12: return VR_CMD_MODE_MANUAL;
+        case 10: return VR_CMD_MODE_AUTO;
+        case 11: return VR_CMD_MODE_MANUAL;
         default: return VR_CMD_UNKNOWN;
     }
 }
@@ -121,7 +119,7 @@ static esp_err_t init_sr_models(void)
         goto err_cleanup_afe;
     }
 
-    s_mn_model = s_mn_iface->create(mn_name, 5000);
+    s_mn_model = s_mn_iface->create(mn_name, 15000);
     if (s_mn_model == NULL) {
         ESP_LOGE(TAG, "Failed to create MultiNet model");
         goto err_cleanup_afe;
@@ -313,15 +311,21 @@ static void vr_detect_task(void *arg)
                         if (s_callback && cmd != VR_CMD_UNKNOWN) {
                             s_callback(cmd);
                         }
-
-                        s_mn_iface->clean(s_mn_model);
                     }
-                    s_state = VR_STATE_WAITING_WAKE;
-                    break;
+                    // 重置 MultiNet 状态，重新开始 15s 超时计时
+                    s_mn_iface->clean(s_mn_model);
+                    mn_accum_len = 0;
+                    ESP_LOGI(TAG, "Continuous listening: waiting for next command (15s timeout reset)");
+                    // 保持在等待命令状态，实现连续对话
+                    // 不 break，继续处理当前音频块中的剩余数据
                 } else if (mn_state == ESP_MN_STATE_TIMEOUT) {
                     ESP_LOGI(TAG, "Command timeout, back to wake mode");
                     s_state = VR_STATE_WAITING_WAKE;
+                    if (s_callback) {
+                        s_callback(VR_CMD_TIMEOUT);
+                    }
                     s_mn_iface->clean(s_mn_model);
+                    mn_accum_len = 0;
                     break;
                 }
             }

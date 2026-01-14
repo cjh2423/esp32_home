@@ -17,8 +17,10 @@ static const char *TAG = "APP_CTRL";
 #define RGB_BRIGHTNESS_BASE   10   // 基础亮度 (静音时) - 降低以节能
 #define RGB_BRIGHTNESS_SPEECH 60   // 语音时亮度
 
-// 当前 RGB 颜色状态
-static rgb_color_t s_current_rgb_color = RGB_COLOR_OFF;
+// 当前 RGB 颜色状态 (RGB 始终保持亮着)
+static rgb_color_t s_current_rgb_color = RGB_COLOR_GREEN;
+static rgb_color_t s_saved_rgb_color = RGB_COLOR_GREEN;  // 唤醒前保存的颜色
+static uint8_t s_last_brightness = 0;  // 缓存上次亮度，避免冗余硬件操作
 
 // 滞回状态记录
 static struct {
@@ -30,7 +32,13 @@ esp_err_t app_control_init(void)
 {
     hysteresis_state.fan_on = false;
     hysteresis_state.led_on = false;
-    ESP_LOGI(TAG, "App Control Initialized");
+
+    // 初始化 RGB 为绿色常亮 (基础亮度)
+    s_last_brightness = RGB_BRIGHTNESS_BASE;
+    rgb_led_set_brightness(RGB_BRIGHTNESS_BASE);
+    rgb_led_set_color(s_current_rgb_color);
+
+    ESP_LOGI(TAG, "App Control Initialized (RGB Green)");
     return ESP_OK;
 }
 
@@ -157,10 +165,25 @@ void app_control_set_mode(sensor_data_t *data, control_mode_t mode)
 
 void app_control_handle_voice_command(vr_command_t command)
 {
-    // 唤醒命令：蜂鸣器提示（不需要锁，避免阻塞临界区）
+    // 唤醒命令
     if (command == VR_CMD_WAKE_UP) {
         ESP_LOGI(TAG, "Voice: Wake up detected");
         buzzer_beep(BUZZER_GPIO, 100);
+
+        // 保存当前颜色并切换到橙色
+        s_saved_rgb_color = s_current_rgb_color;
+        s_current_rgb_color = RGB_COLOR_ORANGE;
+        rgb_led_set_color(RGB_COLOR_ORANGE);
+        return;
+    }
+
+    // 超时命令
+    if (command == VR_CMD_TIMEOUT) {
+        ESP_LOGI(TAG, "Voice: Timeout, exit listening mode");
+
+        // 恢复唤醒前的颜色
+        s_current_rgb_color = s_saved_rgb_color;
+        rgb_led_set_color(s_current_rgb_color);
         return;
     }
 
@@ -209,25 +232,22 @@ void app_control_handle_voice_command(vr_command_t command)
         case VR_CMD_RGB_RED:
             ESP_LOGI(TAG, "Voice: RGB Red");
             s_current_rgb_color = RGB_COLOR_RED;
+            s_saved_rgb_color = RGB_COLOR_RED;  // 保留用户选择
             rgb_led_set_color(RGB_COLOR_RED);
             break;
 
         case VR_CMD_RGB_GREEN:
             ESP_LOGI(TAG, "Voice: RGB Green");
             s_current_rgb_color = RGB_COLOR_GREEN;
+            s_saved_rgb_color = RGB_COLOR_GREEN;  // 保留用户选择
             rgb_led_set_color(RGB_COLOR_GREEN);
             break;
 
         case VR_CMD_RGB_BLUE:
             ESP_LOGI(TAG, "Voice: RGB Blue");
             s_current_rgb_color = RGB_COLOR_BLUE;
+            s_saved_rgb_color = RGB_COLOR_BLUE;  // 保留用户选择
             rgb_led_set_color(RGB_COLOR_BLUE);
-            break;
-
-        case VR_CMD_RGB_OFF:
-            ESP_LOGI(TAG, "Voice: RGB Off");
-            s_current_rgb_color = RGB_COLOR_OFF;
-            rgb_led_off();
             break;
 
         case VR_CMD_CURTAIN_OPEN:
@@ -264,16 +284,13 @@ void app_control_handle_voice_command(vr_command_t command)
 
 void app_control_handle_vad_state(vr_vad_state_t state)
 {
-    if (s_current_rgb_color == RGB_COLOR_OFF) {
-        return;  // RGB LED 关闭时不响应 VAD
-    }
+    // VAD 状态控制亮度：语音时高亮，静音时低亮
+    uint8_t target_brightness = (state == VR_VAD_SPEECH) ? RGB_BRIGHTNESS_SPEECH : RGB_BRIGHTNESS_BASE;
 
-    if (state == VR_VAD_SPEECH) {
-        rgb_led_set_brightness(RGB_BRIGHTNESS_SPEECH);
-    } else {
-        rgb_led_set_brightness(RGB_BRIGHTNESS_BASE);
+    // 仅在亮度变化时才操作硬件，避免冗余 I2C/GPIO 调用
+    if (s_last_brightness != target_brightness) {
+        s_last_brightness = target_brightness;
+        rgb_led_set_brightness(target_brightness);
+        rgb_led_set_color(s_current_rgb_color);
     }
-
-    // 重新设置颜色以应用新亮度
-    rgb_led_set_color(s_current_rgb_color);
 }

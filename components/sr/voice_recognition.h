@@ -21,9 +21,9 @@ typedef enum {
     VR_CMD_RGB_RED,         // RGB 红色
     VR_CMD_RGB_GREEN,       // RGB 绿色
     VR_CMD_RGB_BLUE,        // RGB 蓝色
-    VR_CMD_RGB_OFF,         // RGB 关闭
     VR_CMD_MODE_AUTO,       // 自动模式
     VR_CMD_MODE_MANUAL,     // 手动模式
+    VR_CMD_TIMEOUT,         // 语音超时 (退出唤醒)
     VR_CMD_UNKNOWN          // 未知命令
 } vr_command_t;
 
