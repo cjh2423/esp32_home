@@ -282,7 +282,7 @@ static esp_err_t init_network(const app_config_t *config)
 
         if (config->enable_http_server) {
             sensor_data_t *sensor_data = app_state_get();
-            if (http_server_start(sensor_data) == ESP_OK) {
+            if (http_server_start(sensor_data) != NULL) {
                 s_init_status.http_ok = true;
             }
         }

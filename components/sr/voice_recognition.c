@@ -27,10 +27,12 @@ static const char *s_commands[] = {
     "guan bi deng guang",   // ID 2: 关闭灯光
     "da kai feng shan",     // ID 3: 打开风扇
     "guan bi feng shan",    // ID 4: 关闭风扇
-    "hong se",              // ID 5: RGB 红色
-    "lv se",                // ID 6: RGB 绿色
-    "lan se",               // ID 7: RGB 蓝色
-    "guan bi cai deng",     // ID 8: RGB 关闭
+    "da kai chuang lian",   // ID 5: 打开窗帘
+    "guan bi chuang lian",  // ID 6: 关闭窗帘
+    "hong se",              // ID 7: RGB 红色
+    "lv se",                // ID 8: RGB 绿色
+    "lan se",               // ID 9: RGB 蓝色
+    "guan bi cai deng",     // ID 10: RGB 关闭
 };
 #define NUM_COMMANDS (sizeof(s_commands) / sizeof(s_commands[0]))
 
@@ -70,10 +72,12 @@ static vr_command_t map_command_id(int id)
         case 2: return VR_CMD_LIGHT_OFF;
         case 3: return VR_CMD_FAN_ON;
         case 4: return VR_CMD_FAN_OFF;
-        case 5: return VR_CMD_RGB_RED;
-        case 6: return VR_CMD_RGB_GREEN;
-        case 7: return VR_CMD_RGB_BLUE;
-        case 8: return VR_CMD_RGB_OFF;
+        case 5: return VR_CMD_CURTAIN_OPEN;
+        case 6: return VR_CMD_CURTAIN_CLOSE;
+        case 7: return VR_CMD_RGB_RED;
+        case 8: return VR_CMD_RGB_GREEN;
+        case 9: return VR_CMD_RGB_BLUE;
+        case 10: return VR_CMD_RGB_OFF;
         default: return VR_CMD_UNKNOWN;
     }
 }

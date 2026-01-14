@@ -43,9 +43,10 @@ extern "C" {
  * - 局部变量: 根据实际使用
  * - 函数调用深度: 每层 ~100 bytes
  * - 安全余量: 20-30%
+ * - 注意: DHT 驱动错误处理时调用 ESP_LOGE 消耗较多堆栈
  */
-#define APP_STACK_SIZE_SENSOR    (2 * 1024)   // 传感器任务 (简单I2C/ADC读取)
-#define APP_STACK_SIZE_CONTROL   (2 * 1024)   // 控制任务 (逻辑处理)
+#define APP_STACK_SIZE_SENSOR    (6 * 1024)   // 传感器任务 (DHT/I2C/ADC + 错误日志)
+#define APP_STACK_SIZE_CONTROL   (3 * 1024)   // 控制任务 (逻辑处理)
 #define APP_STACK_SIZE_VR_FEED   (4 * 1024)   // 音频采集 (I2S缓冲)
 #define APP_STACK_SIZE_VR_DETECT (8 * 1024)   // 语音识别 (神经网络)
 

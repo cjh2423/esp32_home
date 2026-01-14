@@ -1,3 +1,10 @@
+/**
+ * @file servo_driver.c
+ * @brief 舵机驱动封装 - 使用本地修改的 iot_servo 驱动
+ *
+ * 基于 espressif/servo 组件，已修改时钟配置 (LEDC_APB_CLK) 避免冲突
+ */
+
 #include "servo_driver.h"
 #include "iot_servo.h"
 #include "esp_log.h"
@@ -20,7 +27,7 @@ esp_err_t motor_init(uint8_t servo_gpio)
         .min_width_us = SERVO_MIN_WIDTH_US,
         .max_width_us = SERVO_MAX_WIDTH_US,
         .freq = SERVO_FREQ,
-        .timer_number = LEDC_TIMER_1,  // 使用 Timer 1，避免与 LED 冲突
+        .timer_number = LEDC_TIMER_3,  // 使用 Timer 3，避免与 LED(0)/Fan(2) 冲突
         .channels = {
             .servo_pin = {servo_gpio, -1, -1, -1, -1, -1, -1, -1},
             .ch = {LEDC_CHANNEL_2, -1, -1, -1, -1, -1, -1, -1},
@@ -35,10 +42,10 @@ esp_err_t motor_init(uint8_t servo_gpio)
     }
 
     // 初始位置设置为 0 度
-    iot_servo_write_angle(LEDC_LOW_SPEED_MODE, 0, 0);
+    iot_servo_write_angle(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_2, 0);
 
     s_initialized = true;
-    ESP_LOGI(TAG, "Servo Motor initialized on GPIO %d (using espressif/servo)", servo_gpio);
+    ESP_LOGI(TAG, "Servo initialized on GPIO %d (TIMER_3, APB_CLK)", servo_gpio);
     return ESP_OK;
 }
 
@@ -51,7 +58,7 @@ esp_err_t servo_set_angle(float angle)
     if (angle < 0) angle = 0;
     if (angle > SERVO_MAX_ANGLE) angle = SERVO_MAX_ANGLE;
 
-    return iot_servo_write_angle(LEDC_LOW_SPEED_MODE, 0, angle);
+    return iot_servo_write_angle(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_2, angle);
 }
 
 esp_err_t curtain_control(uint8_t open)
@@ -62,7 +69,7 @@ esp_err_t curtain_control(uint8_t open)
 
     esp_err_t ret = servo_set_angle(angle);
     if (ret == ESP_OK) {
-        ESP_LOGD(TAG, "Curtain (Servo) set to %s (Angle: %.0f)",
+        ESP_LOGD(TAG, "Curtain set to %s (Angle: %.0f)",
                  open ? "OPEN" : "CLOSED", angle);
     }
     return ret;
@@ -73,6 +80,6 @@ void motor_deinit(void)
     if (s_initialized) {
         iot_servo_deinit(LEDC_LOW_SPEED_MODE);
         s_initialized = false;
-        ESP_LOGI(TAG, "Servo Motor deinitialized");
+        ESP_LOGI(TAG, "Servo deinitialized");
     }
 }

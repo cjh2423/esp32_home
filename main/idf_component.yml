@@ -3,8 +3,7 @@ dependencies:
   espressif/esp-sr: "^2.3.0"
   # RGB LED Strip 驱动
   espressif/led_strip: "^2.5.0"
-  # 舵机驱动 (Espressif 官方)
-  espressif/servo: "^0.1.0"
+  # 舵机驱动已移至本地 components/managed_wrappers/servo/
   # DHT11/DHT22 温湿度传感器
   esp-idf-lib/dht: "*"
   # BH1750 光照传感器

@@ -16,6 +16,8 @@ typedef enum {
     VR_CMD_LIGHT_OFF,       // 关闭灯光
     VR_CMD_FAN_ON,          // 打开风扇
     VR_CMD_FAN_OFF,         // 关闭风扇
+    VR_CMD_CURTAIN_OPEN,    // 打开窗帘
+    VR_CMD_CURTAIN_CLOSE,   // 关闭窗帘
     VR_CMD_RGB_RED,         // RGB 红色
     VR_CMD_RGB_GREEN,       // RGB 绿色
     VR_CMD_RGB_BLUE,        // RGB 蓝色

@@ -223,6 +223,18 @@ void app_control_handle_voice_command(vr_command_t command)
             rgb_led_off();
             break;
 
+        case VR_CMD_CURTAIN_OPEN:
+            ESP_LOGI(TAG, "Voice: Open curtain");
+            data->curtain_state = 1;
+            curtain_control(1);
+            break;
+
+        case VR_CMD_CURTAIN_CLOSE:
+            ESP_LOGI(TAG, "Voice: Close curtain");
+            data->curtain_state = 0;
+            curtain_control(0);
+            break;
+
         default:
             ESP_LOGW(TAG, "Unknown voice command: %d", command);
             break;
