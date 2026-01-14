@@ -2,418 +2,308 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>智能家居</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@300;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;500&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
 :root{
---bg:#0a0a0f;--card:#14141f;--card-border:#1e1e2e;
---cyan:#00d4ff;--orange:#ff6b35;--green:#00ff88;--red:#ff4757;
---text:#e8e8e8;--muted:#5a5a6e;
+--bg-deep:#050510;--bg-glass:rgba(20,20,40,0.7);--glass-border:rgba(100,120,255,0.2);
+--primary:#6366f1;--cyan:#22d3ee;--orange:#f97316;--red:#ef4444;--green:#22c55e;
+--text:#e2e8f0;--text-dim:#64748b;
+--nav-h:70px;
 }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{
-font-family:'Noto Sans SC',sans-serif;
-background:var(--bg);
-color:var(--text);
-min-height:100vh;
-padding:20px;
-background-image:
-radial-gradient(ellipse at 20% 80%,rgba(0,212,255,0.03) 0%,transparent 50%),
-radial-gradient(ellipse at 80% 20%,rgba(255,107,53,0.03) 0%,transparent 50%);
+font-family:'Noto Sans SC',sans-serif;background:var(--bg-deep);color:var(--text);
+height:100vh;overflow:hidden;display:flex;flex-direction:column;
 }
-.header{
-text-align:center;
-padding:20px 0 30px;
-border-bottom:1px solid var(--card-border);
-margin-bottom:30px;
+/* Background FX */
+.bg-fx{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.bg-fx::before{
+content:'';position:absolute;inset:0;
+background:radial-gradient(circle at 20% 30%,rgba(99,102,241,0.15),transparent 50%),
+radial-gradient(circle at 80% 70%,rgba(34,211,238,0.1),transparent 50%);
 }
-.header h1{
-font-weight:300;
-font-size:1.4rem;
-letter-spacing:8px;
-text-transform:uppercase;
-color:var(--muted);
+.scanline{
+position:fixed;inset:0;z-index:999;pointer-events:none;
+background:linear-gradient(to bottom,rgba(255,255,255,0),rgba(255,255,255,0) 50%,rgba(0,0,0,0.1) 50%,rgba(0,0,0,0.1));
+background-size:100% 4px;opacity:0.6;
 }
-.header .status{
-display:inline-flex;
-align-items:center;
-gap:8px;
-margin-top:12px;
-font-family:'JetBrains Mono',monospace;
-font-size:0.75rem;
-color:var(--green);
+
+/* Header */
+.app-header{
+padding:20px 20px 10px;text-align:center;flex-shrink:0;
+display:flex;justify-content:space-between;align-items:center;
+border-bottom:1px solid rgba(255,255,255,0.05);
+background:rgba(5,5,16,0.8);backdrop-filter:blur(10px);
 }
-.header .status::before{
-content:'';
-width:6px;height:6px;
-background:var(--green);
-border-radius:50%;
-animation:pulse 2s infinite;
+.logo{font-family:'Orbitron';font-weight:900;letter-spacing:2px;background:linear-gradient(to right,var(--primary),var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.sys-status{font-family:'Orbitron';font-size:10px;color:var(--green);display:flex;align-items:center;gap:6px}
+.dot{width:6px;height:6px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+
+/* Main View Container */
+.main-viewport{
+flex:1;position:relative;overflow:hidden;
 }
-@keyframes pulse{
-0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,255,136,0.4)}
-50%{opacity:0.6;box-shadow:0 0 0 8px rgba(0,255,136,0)}
+.view{
+position:absolute;inset:0;padding:20px;padding-bottom:var(--nav-h);
+overflow-y:auto;opacity:0;transform:translateY(10px);pointer-events:none;
+transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+display:flex;flex-direction:column;gap:16px;
 }
-.grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
-gap:16px;
-max-width:720px;
-margin:0 auto;
+.view.active{opacity:1;transform:translateY(0);pointer-events:auto;z-index:10}
+
+/* Components */
+.card{
+background:var(--bg-glass);border:1px solid var(--glass-border);
+border-radius:16px;padding:16px;backdrop-filter:blur(20px);
+box-shadow:0 8px 32px rgba(0,0,0,0.2);
 }
-.gauge{
-background:var(--card);
-border:1px solid var(--card-border);
-border-radius:16px;
-padding:24px 16px;
-text-align:center;
-position:relative;
-overflow:hidden;
-transition:all 0.3s ease;
+.section-title{font-family:'Orbitron';font-size:12px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px;padding-left:4px}
+
+/* Dashboard Gauges */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.gauge-box{text-align:center;padding:16px 0;position:relative}
+.gauge-svg{width:80px;height:80px;transform:rotate(-90deg)}
+.gauge-bg{fill:none;stroke:rgba(255,255,255,0.1);stroke-width:8}
+.gauge-val{fill:none;stroke-width:8;stroke-linecap:round;stroke-dasharray:220;stroke-dashoffset:220;transition:stroke-dashoffset 1s}
+.gauge-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);margin-top:-8px}
+.val-text{font-family:'Orbitron';font-size:18px;font-weight:700}
+.unit{font-size:10px;color:var(--text-dim)}
+.label{font-size:12px;color:var(--text-dim);margin-top:8px}
+
+/* Device Controls */
+.dev-row{display:flex;justify-content:space-between;align-items:center}
+.dev-icon{width:40px;height:40px;background:rgba(99,102,241,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.dev-info{flex:1;margin-left:12px}
+.dev-name{font-size:14px;font-weight:500}
+.dev-status{font-size:12px;color:var(--text-dim)}
+/* Toggle */
+.toggle{width:50px;height:28px;background:rgba(255,255,255,0.1);border-radius:14px;position:relative;transition:0.3s;cursor:pointer}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:24px;height:24px;background:#fff;border-radius:50%;transition:0.3s;box-shadow:0 2px 5px rgba(0,0,0,0.3)}
+.toggle.on{background:var(--primary);box-shadow:0 0 15px rgba(99,102,241,0.4)}
+.toggle.on::after{transform:translateX(22px)}
+/* Slider */
+.slider-con{margin-top:16px}
+.slider{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;outline:none}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;background:var(--primary);border-radius:50%;box-shadow:0 0 10px var(--primary)}
+
+/* System View */
+.mode-big{text-align:center;padding:30px 0}
+.mode-ring{width:120px;height:120px;border-radius:50%;border:2px solid var(--glass-border);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-size:18px;position:relative;transition:0.3s}
+.mode-ring.auto{border-color:var(--green);box-shadow:0 0 30px rgba(34,197,94,0.2);color:var(--green)}
+.mode-ring.manual{border-color:var(--orange);box-shadow:0 0 30px rgba(249,115,22,0.2);color:var(--orange)}
+.btn-block{width:100%;padding:14px;background:linear-gradient(135deg,var(--primary),#818cf8);border:none;border-radius:12px;color:#fff;font-family:'Orbitron';letter-spacing:1px;font-size:14px}
+
+/* Bottom Nav */
+.nav-bar{
+position:fixed;bottom:20px;left:20px;right:20px;height:60px;
+background:rgba(20,20,40,0.8);backdrop-filter:blur(20px);
+border-radius:20px;border:1px solid var(--glass-border);
+display:flex;justify-content:space-around;align-items:center;
+box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:100;
 }
-.gauge:hover{
-border-color:var(--cyan);
-transform:translateY(-2px);
+.nav-item{
+display:flex;flex-direction:column;align-items:center;gap:4px;
+color:var(--text-dim);font-size:10px;background:none;border:none;
+transition:0.3s;width:60px;
 }
-.gauge::before{
-content:'';
-position:absolute;
-top:0;left:0;right:0;
-height:2px;
-background:linear-gradient(90deg,transparent,var(--cyan),transparent);
-opacity:0;
-transition:opacity 0.3s;
-}
-.gauge:hover::before{opacity:1}
-.gauge-ring{
-width:100px;height:100px;
-margin:0 auto 16px;
-position:relative;
-}
-.gauge-ring svg{
-transform:rotate(-90deg);
-width:100%;height:100%;
-}
-.gauge-ring circle{
-fill:none;
-stroke-width:6;
-stroke-linecap:round;
-}
-.gauge-ring .bg{stroke:var(--card-border)}
-.gauge-ring .fg{
-stroke:var(--cyan);
-stroke-dasharray:251.2;
-stroke-dashoffset:251.2;
-transition:stroke-dashoffset 1s ease;
-}
-.gauge-ring.temp .fg{stroke:var(--orange)}
-.gauge-ring.smoke .fg{stroke:var(--red)}
-.gauge-ring.light .fg{stroke:#ffd93d}
-.gauge-value{
-position:absolute;
-top:50%;left:50%;
-transform:translate(-50%,-50%);
-font-family:'JetBrains Mono',monospace;
-font-size:1.5rem;
-font-weight:600;
-}
-.gauge-label{
-font-size:0.75rem;
-color:var(--muted);
-text-transform:uppercase;
-letter-spacing:2px;
-}
-.gauge-unit{
-font-size:0.7rem;
-color:var(--muted);
-font-family:'JetBrains Mono',monospace;
-margin-top:4px;
-}
-.section-title{
-font-size:0.7rem;
-color:var(--muted);
-letter-spacing:4px;
-text-transform:uppercase;
-margin:40px 0 20px;
-max-width:720px;
-margin-left:auto;
-margin-right:auto;
-padding-left:4px;
-}
-.controls{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-gap:16px;
-max-width:720px;
-margin:0 auto;
-}
-.device{
-background:var(--card);
-border:1px solid var(--card-border);
-border-radius:16px;
-padding:20px;
-display:flex;
-flex-direction:column;
-gap:16px;
-transition:all 0.3s ease;
-}
-.device:hover{border-color:var(--cyan)}
-.device-header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-}
-.device-name{
-font-size:0.9rem;
-font-weight:500;
-display:flex;
-align-items:center;
-gap:10px;
-}
-.device-icon{
-width:32px;height:32px;
-background:rgba(0,212,255,0.1);
-border-radius:8px;
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:1rem;
-}
-.toggle{
-width:52px;height:28px;
-background:var(--card-border);
-border-radius:14px;
-position:relative;
-cursor:pointer;
-transition:all 0.3s ease;
-border:none;
-}
-.toggle.on{background:var(--cyan)}
-.toggle::after{
-content:'';
-position:absolute;
-width:22px;height:22px;
-background:#fff;
-border-radius:50%;
-top:3px;left:3px;
-transition:all 0.3s ease;
-}
-.toggle.on::after{left:27px}
-.slider-wrap{
-display:flex;
-flex-direction:column;
-gap:8px;
-}
-.slider-label{
-display:flex;
-justify-content:space-between;
-font-size:0.75rem;
-color:var(--muted);
-}
-.slider-value{
-font-family:'JetBrains Mono',monospace;
-color:var(--cyan);
-}
-.slider{
--webkit-appearance:none;
-width:100%;
-height:4px;
-background:var(--card-border);
-border-radius:2px;
-outline:none;
-}
-.slider::-webkit-slider-thumb{
--webkit-appearance:none;
-width:16px;height:16px;
-background:var(--cyan);
-border-radius:50%;
-cursor:pointer;
-box-shadow:0 0 10px rgba(0,212,255,0.5);
-transition:all 0.2s;
-}
-.slider::-webkit-slider-thumb:hover{
-transform:scale(1.2);
-box-shadow:0 0 20px rgba(0,212,255,0.8);
-}
-.footer{
-text-align:center;
-margin-top:40px;
-padding:20px;
-font-size:0.7rem;
-color:var(--muted);
-font-family:'JetBrains Mono',monospace;
-letter-spacing:1px;
-}
-@media(max-width:480px){
-.grid{grid-template-columns:repeat(2,1fr);gap:12px}
-.gauge{padding:16px 12px}
-.gauge-ring{width:80px;height:80px}
-.gauge-value{font-size:1.2rem}
-.controls{grid-template-columns:1fr}
-}
+.nav-icon{font-size:20px;transition:0.3s}
+.nav-item.active{color:var(--primary)}
+.nav-item.active .nav-icon{transform:translateY(-2px);text-shadow:0 0 10px var(--primary)}
+
+/* Toast */
+.toast-box{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{background:rgba(20,20,40,0.9);border:1px solid var(--glass-border);padding:10px 20px;border-radius:30px;font-size:12px;display:flex;align-items:center;gap:8px;backdrop-filter:blur(10px);animation:slideDown 0.3s}
+@keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}
 </style>
 </head>
 <body>
-<header class="header">
-<h1>智能家居</h1>
-<div class="status">SYSTEM ONLINE</div>
+<div class="bg-fx"></div><div class="scanline"></div>
+
+<header class="app-header">
+<div class="logo">SMART HOME</div>
+<div class="sys-status"><span class="dot"></span>ONLINE</div>
 </header>
 
-<div class="section-title">环境监测</div>
-<div class="grid">
-<div class="gauge">
-<div class="gauge-ring temp">
-<svg viewBox="0 0 100 100">
-<circle class="bg" cx="50" cy="50" r="40"/>
-<circle class="fg" id="tempRing" cx="50" cy="50" r="40"/>
-</svg>
-<div class="gauge-value" id="temp">--</div>
+<main class="main-viewport">
+<!-- Dashboard View -->
+<div id="view-dashboard" class="view active">
+<div class="section-title">ENVIRONMENT</div>
+<div class="grid-2">
+<div class="card gauge-box">
+<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-temp" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--orange)"/></svg>
+<div class="gauge-center"><div class="val-text" id="t-temp">--</div><div class="unit">°C</div></div>
+<div class="label">温度</div>
 </div>
-<div class="gauge-label">温度</div>
-<div class="gauge-unit">°C</div>
+<div class="card gauge-box">
+<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-humi" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--cyan)"/></svg>
+<div class="gauge-center"><div class="val-text" id="t-humi">--</div><div class="unit">%</div></div>
+<div class="label">湿度</div>
 </div>
-<div class="gauge">
-<div class="gauge-ring">
-<svg viewBox="0 0 100 100">
-<circle class="bg" cx="50" cy="50" r="40"/>
-<circle class="fg" id="humiRing" cx="50" cy="50" r="40"/>
-</svg>
-<div class="gauge-value" id="humi">--</div>
+<div class="card gauge-box">
+<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-light" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--primary)"/></svg>
+<div class="gauge-center"><div class="val-text" id="t-light">--</div><div class="unit">LUX</div></div>
+<div class="label">光照</div>
 </div>
-<div class="gauge-label">湿度</div>
-<div class="gauge-unit">%</div>
+<div class="card gauge-box">
+<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-smoke" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--red)"/></svg>
+<div class="gauge-center"><div class="val-text" id="t-smoke">--</div><div class="unit">ADC</div></div>
+<div class="label">烟雾</div>
 </div>
-<div class="gauge">
-<div class="gauge-ring light">
-<svg viewBox="0 0 100 100">
-<circle class="bg" cx="50" cy="50" r="40"/>
-<circle class="fg" id="lightRing" cx="50" cy="50" r="40"/>
-</svg>
-<div class="gauge-value" id="light">--</div>
 </div>
-<div class="gauge-label">光照</div>
-<div class="gauge-unit">LUX</div>
-</div>
-<div class="gauge">
-<div class="gauge-ring smoke">
-<svg viewBox="0 0 100 100">
-<circle class="bg" cx="50" cy="50" r="40"/>
-<circle class="fg" id="smokeRing" cx="50" cy="50" r="40"/>
-</svg>
-<div class="gauge-value" id="smoke">--</div>
-</div>
-<div class="gauge-label">烟雾</div>
-<div class="gauge-unit">ADC</div>
+<div class="section-title">QUICK STATUS</div>
+<div class="card" style="padding:12px;display:flex;justify-content:space-between">
+<span style="font-size:12px;color:var(--text-dim)">当前模式</span>
+<span id="q-mode" style="font-family:'Orbitron';color:var(--primary)">AUTO</span>
 </div>
 </div>
 
-<div class="section-title">设备控制</div>
-<div class="controls">
-<div class="device">
-<div class="device-header">
-<div class="device-name">
-<div class="device-icon">⚙️</div>
-<span>控制模式</span>
+<!-- Devices View -->
+<div id="view-devices" class="view">
+<div class="section-title">LIGHTING</div>
+<div class="card">
+<div class="dev-row">
+<div class="dev-icon">💡</div>
+<div class="dev-info"><div class="dev-name">主照明</div><div class="dev-status" id="s-led">已关闭</div></div>
+<div class="toggle" id="btn-led" onclick="Actions.toggle('led')"></div>
 </div>
-<button class="toggle" id="modeToggle" onclick="toggleMode()"></button>
+<div class="slider-con"><input type="range" class="slider" min="0" max="255" id="sl-led" onchange="Actions.slide('led',this.value)"></div>
 </div>
-<div class="slider-wrap">
-<div class="slider-label">
-<span>当前模式</span>
-<span class="slider-value" id="modeStatus">自动</span>
+
+<div class="section-title">CLIMATE</div>
+<div class="card">
+<div class="dev-row">
+<div class="dev-icon">🌀</div>
+<div class="dev-info"><div class="dev-name">排风扇</div><div class="dev-status" id="s-fan">已关闭</div></div>
+<div class="toggle" id="btn-fan" onclick="Actions.toggle('fan')"></div>
 </div>
+<div class="slider-con"><input type="range" class="slider" min="0" max="255" id="sl-fan" onchange="Actions.slide('fan',this.value)"></div>
 </div>
-</div>
-<div class="device">
-<div class="device-header">
-<div class="device-name">
-<div class="device-icon">💡</div>
-<span>照明系统</span>
-</div>
-<button class="toggle" id="ledToggle" onclick="toggleLED()"></button>
-</div>
-<div class="slider-wrap">
-<div class="slider-label">
-<span>亮度</span>
-<span class="slider-value" id="brightness">0</span>
-</div>
-<input type="range" min="0" max="255" value="0" class="slider" id="brightnessSlider" oninput="setBrightness(this.value)">
-</div>
-</div>
-<div class="device">
-<div class="device-header">
-<div class="device-name">
-<div class="device-icon">🌀</div>
-<span>通风系统</span>
-</div>
-<button class="toggle" id="fanToggle" onclick="toggleFan()"></button>
-</div>
-<div class="slider-wrap">
-<div class="slider-label">
-<span>转速</span>
-<span class="slider-value" id="fanSpeed">0</span>
-</div>
-<input type="range" min="0" max="255" value="0" class="slider" id="fanSpeedSlider" oninput="setFanSpeed(this.value)">
-</div>
-</div>
-<div class="device">
-<div class="device-header">
-<div class="device-name">
-<div class="device-icon">🪟</div>
-<span>智能窗帘</span>
-</div>
-<button class="toggle" id="curtainToggle" onclick="toggleCurtain()"></button>
-</div>
-<div class="slider-wrap">
-<div class="slider-label">
-<span>状态</span>
-<span class="slider-value" id="curtainStatus">关闭</span>
-</div>
+
+<div class="section-title">ACCESS</div>
+<div class="card">
+<div class="dev-row">
+<div class="dev-icon">🪟</div>
+<div class="dev-info"><div class="dev-name">智能窗帘</div><div class="dev-status" id="s-curt">已关闭</div></div>
+<div class="toggle" id="btn-curt" onclick="Actions.toggle('curtain')"></div>
 </div>
 </div>
 </div>
 
-<footer class="footer">
-ESP32-S3 SMART HOME v1.0
-</footer>
+<!-- System View -->
+<div id="view-system" class="view">
+<div class="section-title">CONTROL MODE</div>
+<div class="card mode-big">
+<div id="ring-mode" class="mode-ring auto">AUTO</div>
+<button class="btn-block" onclick="Actions.toggleMode()">切换模式 (SWITCH)</button>
+<p style="margin-top:16px;font-size:12px;color:var(--text-dim)">自动模式下设备将根据传感器数据自动运行</p>
+</div>
+<div class="section-title">SYSTEM INFO</div>
+<div class="card">
+<div class="dev-row" style="margin-bottom:8px"><span class="dev-status">Device IP</span><span class="dev-status" style="color:var(--text)">192.168.4.1</span></div>
+<div class="dev-row"><span class="dev-status">Firmware</span><span class="dev-status" style="color:var(--text)">v2.0.1 Sci-Fi</span></div>
+</div>
+</div>
+</main>
+
+<nav class="nav-bar">
+<button class="nav-item active" onclick="Router.go('dashboard')"><span class="nav-icon">🏠</span><span>概览</span></button>
+<button class="nav-item" onclick="Router.go('devices')"><span class="nav-icon">🎛️</span><span>设备</span></button>
+<button class="nav-item" onclick="Router.go('system')"><span class="nav-icon">⚙️</span><span>系统</span></button>
+</nav>
+
+<div class="toast-box" id="toast-box"></div>
 
 <script>
-const C=251.2;
-function setRing(id,pct){
-document.getElementById(id).style.strokeDashoffset=C*(1-Math.min(pct,1));
+// State Store
+const Store={
+data:{},
+subscribers:[],
+update(d){
+const old=JSON.stringify(this.data);
+const neu=JSON.stringify(d);
+if(old!==neu){this.data={...this.data,...d};this.notify()}
+},
+subscribe(fn){this.subscribers.push(fn)},
+notify(){this.subscribers.forEach(fn=>fn(this.data))}
+};
+
+// Router
+const Router={
+go(id){
+document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+document.getElementById('view-'+id).classList.add('active');
+event.currentTarget.classList.add('active');
 }
-function updateData(){
-fetch('/api/data').then(r=>r.json()).then(d=>{
-document.getElementById('temp').innerText=d.temperature.toFixed(1);
-document.getElementById('humi').innerText=d.humidity.toFixed(0);
-document.getElementById('light').innerText=d.light.toFixed(0);
-document.getElementById('smoke').innerText=d.smoke;
-setRing('tempRing',d.temperature/50);
-setRing('humiRing',d.humidity/100);
-setRing('lightRing',Math.min(d.light/1000,1));
-setRing('smokeRing',d.smoke/4095);
-document.getElementById('ledToggle').className='toggle'+(d.led_state?' on':'');
-document.getElementById('fanToggle').className='toggle'+(d.fan_state?' on':'');
-document.getElementById('curtainToggle').className='toggle'+(d.curtain_state?' on':'');
-document.getElementById('brightness').innerText=d.led_brightness;
-document.getElementById('brightnessSlider').value=d.led_brightness;
-document.getElementById('fanSpeed').innerText=d.fan_speed;
-document.getElementById('fanSpeedSlider').value=d.fan_speed;
-document.getElementById('curtainStatus').innerText=d.curtain_state?'开启':'关闭';
-document.getElementById('modeToggle').className='toggle'+(d.control_mode===0?' on':'');
-document.getElementById('modeStatus').innerText=d.control_mode===0?'自动':'手动';
-}).catch(()=>{});
+};
+
+// UI Renderer
+const UI={
+init(){
+Store.subscribe(this.render);
+setInterval(()=>this.poll(),2000);
+this.poll();
+},
+poll(){fetch('/api/data').then(r=>r.json()).then(d=>Store.update(d))},
+render(d){
+// Dashboard
+const setG=(id,v,max)=>{
+const off=220*(1-Math.min(v/max,1));
+document.getElementById(id).style.strokeDashoffset=off;
+};
+setG('g-temp',d.temperature,50);document.getElementById('t-temp').innerText=d.temperature.toFixed(1);
+setG('g-humi',d.humidity,100);document.getElementById('t-humi').innerText=d.humidity.toFixed(0);
+setG('g-light',d.light,1000);document.getElementById('t-light').innerText=d.light.toFixed(0);
+setG('g-smoke',d.smoke,4095);document.getElementById('t-smoke').innerText=d.smoke;
+document.getElementById('q-mode').innerText=d.control_mode===0?'AUTO':'MANUAL';
+
+// Devices
+const setT=(id,s)=>{document.getElementById(id).className='toggle '+(s?'on':'')};
+setT('btn-led',d.led_state);document.getElementById('s-led').innerText=d.led_state?'已开启':'已关闭';
+document.getElementById('sl-led').value=d.led_brightness;
+setT('btn-fan',d.fan_state);document.getElementById('s-fan').innerText=d.fan_state?'已开启':'已关闭';
+document.getElementById('sl-fan').value=d.fan_speed;
+setT('btn-curt',d.curtain_state);document.getElementById('s-curt').innerText=d.curtain_state?'已开启':'已关闭';
+
+// System
+const rm=document.getElementById('ring-mode');
+if(d.control_mode===0){rm.className='mode-ring auto';rm.innerText='AUTO'}
+else{rm.className='mode-ring manual';rm.innerText='MANUAL'}
 }
-function toggleLED(){fetch('/api/led/toggle').then(updateData)}
-function toggleFan(){fetch('/api/fan/toggle').then(updateData)}
-function toggleCurtain(){fetch('/api/curtain/toggle').then(updateData)}
-function toggleMode(){fetch('/api/mode/toggle').then(updateData)}
-function setBrightness(v){fetch('/api/led/brightness?value='+v).then(updateData)}
-function setFanSpeed(v){fetch('/api/fan/speed?value='+v).then(updateData)}
-setInterval(updateData,2000);
-updateData();
+};
+
+// Actions
+const Actions={
+toast(msg){
+const b=document.getElementById('toast-box');
+const t=document.createElement('div');t.className='toast';
+t.innerHTML='<span>✓</span>'+msg;b.appendChild(t);
+setTimeout(()=>t.remove(),2000);
+},
+async req(url,msg){
+try{
+const r=await fetch(url);
+if(r.ok){this.toast(msg);UI.poll()}
+}catch(e){console.error(e)}
+},
+toggle(dev){
+if(dev==='led') this.req('/api/led/toggle','照明切换');
+if(dev==='fan') this.req('/api/fan/toggle','风扇切换');
+if(dev==='curtain') this.req('/api/curtain/toggle','窗帘切换');
+},
+slide(dev,v){
+if(dev==='led') fetch('/api/led/brightness?value='+v);
+if(dev==='fan') fetch('/api/fan/speed?value='+v);
+},
+toggleMode(){this.req('/api/mode/toggle','模式已切换')}
+};
+
+// Init
+document.addEventListener('DOMContentLoaded',()=>UI.init());
 </script>
 </body>
 </html>
