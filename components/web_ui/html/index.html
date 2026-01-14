@@ -89,12 +89,54 @@ box-shadow:0 8px 32px rgba(0,0,0,0.2);
 .slider{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;outline:none}
 .slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;background:var(--primary);border-radius:50%;box-shadow:0 0 10px var(--primary)}
 
+/* RGB Color Picker */
+.rgb-section{margin-top:8px}
+.color-presets{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
+.color-btn{
+width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);
+cursor:pointer;transition:all 0.3s;position:relative;
+}
+.color-btn:hover{transform:scale(1.15);border-color:rgba(255,255,255,0.5)}
+.color-btn.active{border-color:#fff;box-shadow:0 0 15px currentColor}
+.color-btn::after{content:'';position:absolute;inset:3px;border-radius:50%;background:inherit}
+
+/* Color Picker Wheel */
+.color-picker-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
+.color-wheel{
+width:180px;height:180px;border-radius:50%;
+background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);
+position:relative;cursor:crosshair;
+box-shadow:0 0 20px rgba(99,102,241,0.3);
+}
+.color-wheel::before{
+content:'';position:absolute;inset:0;border-radius:50%;
+background:radial-gradient(circle,#fff 0%,transparent 70%);
+}
+.color-wheel-pointer{
+position:absolute;width:16px;height:16px;border:2px solid #fff;
+border-radius:50%;transform:translate(-50%,-50%);
+box-shadow:0 0 5px rgba(0,0,0,0.5);pointer-events:none;
+}
+.color-preview{
+width:60px;height:60px;border-radius:12px;
+border:2px solid var(--glass-border);
+box-shadow:0 0 20px currentColor;
+}
+.rgb-sliders{width:100%;max-width:250px}
+.rgb-slider-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rgb-slider-row span{width:20px;font-family:'Orbitron';font-size:12px;font-weight:700}
+.rgb-slider-row input{flex:1;height:6px}
+.rgb-slider-row input[type="range"]::-webkit-slider-thumb{width:14px;height:14px}
+.r-slider::-webkit-slider-thumb{background:#ef4444!important;box-shadow:0 0 8px #ef4444}
+.g-slider::-webkit-slider-thumb{background:#22c55e!important;box-shadow:0 0 8px #22c55e}
+.b-slider::-webkit-slider-thumb{background:#3b82f6!important;box-shadow:0 0 8px #3b82f6}
+
 /* System View */
 .mode-big{text-align:center;padding:30px 0}
 .mode-ring{width:120px;height:120px;border-radius:50%;border:2px solid var(--glass-border);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-size:18px;position:relative;transition:0.3s}
 .mode-ring.auto{border-color:var(--green);box-shadow:0 0 30px rgba(34,197,94,0.2);color:var(--green)}
 .mode-ring.manual{border-color:var(--orange);box-shadow:0 0 30px rgba(249,115,22,0.2);color:var(--orange)}
-.btn-block{width:100%;padding:14px;background:linear-gradient(135deg,var(--primary),#818cf8);border:none;border-radius:12px;color:#fff;font-family:'Orbitron';letter-spacing:1px;font-size:14px}
+.btn-block{width:100%;padding:14px;background:linear-gradient(135deg,var(--primary),#818cf8);border:none;border-radius:12px;color:#fff;font-family:'Orbitron';letter-spacing:1px;font-size:14px;cursor:pointer}
 
 /* Bottom Nav */
 .nav-bar{
@@ -107,7 +149,7 @@ box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:100;
 .nav-item{
 display:flex;flex-direction:column;align-items:center;gap:4px;
 color:var(--text-dim);font-size:10px;background:none;border:none;
-transition:0.3s;width:60px;
+transition:0.3s;width:60px;cursor:pointer;
 }
 .nav-icon{font-size:20px;transition:0.3s}
 .nav-item.active{color:var(--primary)}
@@ -173,6 +215,36 @@ transition:0.3s;width:60px;
 <div class="slider-con"><input type="range" class="slider" min="0" max="255" id="sl-led" onchange="Actions.slide('led',this.value)"></div>
 </div>
 
+<div class="section-title">RGB LED</div>
+<div class="card rgb-section">
+<div class="dev-row" style="margin-bottom:16px">
+<div class="dev-icon" id="rgb-icon" style="background:rgba(34,197,94,0.3)">🌈</div>
+<div class="dev-info"><div class="dev-name">氛围灯</div><div class="dev-status">颜色控制</div></div>
+</div>
+<div class="color-presets">
+<div class="color-btn" style="background:#ef4444" onclick="Actions.rgbPreset('red')" title="红色"></div>
+<div class="color-btn" style="background:#f97316" onclick="Actions.rgbPreset('orange')" title="橙色"></div>
+<div class="color-btn" style="background:#eab308" onclick="Actions.rgbPreset('yellow')" title="黄色"></div>
+<div class="color-btn" style="background:#22c55e" onclick="Actions.rgbPreset('green')" title="绿色"></div>
+<div class="color-btn" style="background:#22d3ee" onclick="Actions.rgbPreset('cyan')" title="青色"></div>
+<div class="color-btn" style="background:#3b82f6" onclick="Actions.rgbPreset('blue')" title="蓝色"></div>
+<div class="color-btn" style="background:#a855f7" onclick="Actions.rgbPreset('purple')" title="紫色"></div>
+<div class="color-btn" style="background:#ec4899" onclick="Actions.rgbPreset('magenta')" title="品红"></div>
+<div class="color-btn" style="background:#fff" onclick="Actions.rgbPreset('white')" title="白色"></div>
+</div>
+<div class="color-picker-wrap">
+<div class="color-wheel" id="color-wheel">
+<div class="color-wheel-pointer" id="wheel-pointer" style="left:90px;top:90px"></div>
+</div>
+<div class="color-preview" id="color-preview" style="background:#22c55e"></div>
+<div class="rgb-sliders">
+<div class="rgb-slider-row"><span style="color:#ef4444">R</span><input type="range" class="slider r-slider" min="0" max="255" value="0" id="sl-r" oninput="Actions.updateRgbFromSliders()"></div>
+<div class="rgb-slider-row"><span style="color:#22c55e">G</span><input type="range" class="slider g-slider" min="0" max="255" value="255" id="sl-g" oninput="Actions.updateRgbFromSliders()"></div>
+<div class="rgb-slider-row"><span style="color:#3b82f6">B</span><input type="range" class="slider b-slider" min="0" max="255" value="0" id="sl-b" oninput="Actions.updateRgbFromSliders()"></div>
+</div>
+</div>
+</div>
+
 <div class="section-title">CLIMATE</div>
 <div class="card">
 <div class="dev-row">
@@ -204,7 +276,7 @@ transition:0.3s;width:60px;
 <div class="section-title">SYSTEM INFO</div>
 <div class="card">
 <div class="dev-row" style="margin-bottom:8px"><span class="dev-status">Device IP</span><span class="dev-status" style="color:var(--text)">192.168.4.1</span></div>
-<div class="dev-row"><span class="dev-status">Firmware</span><span class="dev-status" style="color:var(--text)">v2.0.1 Sci-Fi</span></div>
+<div class="dev-row"><span class="dev-status">Firmware</span><span class="dev-status" style="color:var(--text)">v2.1.0 RGB</span></div>
 </div>
 </div>
 </main>
@@ -221,6 +293,7 @@ transition:0.3s;width:60px;
 // State Store
 const Store={
 data:{},
+rgb:{r:0,g:255,b:0},
 subscribers:[],
 update(d){
 const old=JSON.stringify(this.data);
@@ -247,8 +320,9 @@ init(){
 Store.subscribe(this.render);
 setInterval(()=>this.poll(),2000);
 this.poll();
+this.initColorWheel();
 },
-poll(){fetch('/api/data').then(r=>r.json()).then(d=>Store.update(d))},
+poll(){fetch('/api/data').then(r=>r.json()).then(d=>Store.update(d)).catch(()=>{})},
 render(d){
 // Dashboard
 const setG=(id,v,max)=>{
@@ -273,6 +347,53 @@ setT('btn-curt',d.curtain_state);document.getElementById('s-curt').innerText=d.c
 const rm=document.getElementById('ring-mode');
 if(d.control_mode===0){rm.className='mode-ring auto';rm.innerText='AUTO'}
 else{rm.className='mode-ring manual';rm.innerText='MANUAL'}
+},
+initColorWheel(){
+const wheel=document.getElementById('color-wheel');
+const pointer=document.getElementById('wheel-pointer');
+let isDragging=false;
+
+const getColorFromPos=(x,y)=>{
+const rect=wheel.getBoundingClientRect();
+const cx=rect.width/2,cy=rect.height/2;
+const dx=x-cx,dy=y-cy;
+const dist=Math.sqrt(dx*dx+dy*dy);
+const maxDist=rect.width/2;
+const angle=Math.atan2(dy,dx)*180/Math.PI+180;
+const sat=Math.min(dist/maxDist,1);
+return this.hslToRgb(angle/360,sat,0.5);
+};
+
+const updateFromPos=(clientX,clientY)=>{
+const rect=wheel.getBoundingClientRect();
+let x=clientX-rect.left,y=clientY-rect.top;
+const cx=rect.width/2,cy=rect.height/2;
+const dx=x-cx,dy=y-cy;
+const dist=Math.sqrt(dx*dx+dy*dy);
+const maxDist=rect.width/2;
+if(dist>maxDist){x=cx+dx/dist*maxDist;y=cy+dy/dist*maxDist}
+pointer.style.left=x+'px';
+pointer.style.top=y+'px';
+const rgb=getColorFromPos(x,y);
+Store.rgb=rgb;
+Actions.updatePreview();
+};
+
+wheel.addEventListener('mousedown',e=>{isDragging=true;updateFromPos(e.clientX,e.clientY)});
+wheel.addEventListener('touchstart',e=>{isDragging=true;updateFromPos(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});
+document.addEventListener('mousemove',e=>{if(isDragging)updateFromPos(e.clientX,e.clientY)});
+document.addEventListener('touchmove',e=>{if(isDragging)updateFromPos(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});
+document.addEventListener('mouseup',()=>{if(isDragging){isDragging=false;Actions.sendRgb()}});
+document.addEventListener('touchend',()=>{if(isDragging){isDragging=false;Actions.sendRgb()}});
+},
+hslToRgb(h,s,l){
+let r,g,b;
+if(s===0){r=g=b=l}else{
+const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};
+const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+r=hue2rgb(p,q,h+1/3);g=hue2rgb(p,q,h);b=hue2rgb(p,q,h-1/3);
+}
+return{r:Math.round(r*255),g:Math.round(g*255),b:Math.round(b*255)};
 }
 };
 
@@ -280,8 +401,13 @@ else{rm.className='mode-ring manual';rm.innerText='MANUAL'}
 const Actions={
 toast(msg){
 const b=document.getElementById('toast-box');
-const t=document.createElement('div');t.className='toast';
-t.innerHTML='<span>✓</span>'+msg;b.appendChild(t);
+const t=document.createElement('div');
+t.className='toast';
+const icon=document.createElement('span');
+icon.textContent='✓';
+t.appendChild(icon);
+t.appendChild(document.createTextNode(msg));
+b.appendChild(t);
 setTimeout(()=>t.remove(),2000);
 },
 async req(url,msg){
@@ -299,7 +425,45 @@ slide(dev,v){
 if(dev==='led') fetch('/api/led/brightness?value='+v);
 if(dev==='fan') fetch('/api/fan/speed?value='+v);
 },
-toggleMode(){this.req('/api/mode/toggle','模式已切换')}
+toggleMode(){this.req('/api/mode/toggle','模式已切换')},
+rgbPreset(color){
+fetch('/api/rgb/preset?c='+color).then(()=>{
+this.toast('RGB: '+color);
+// Update preview based on preset
+const colors={red:{r:239,g:68,b:68},orange:{r:249,g:115,b:22},yellow:{r:234,g:179,b:8},
+green:{r:34,g:197,b:94},cyan:{r:34,g:211,b:238},blue:{r:59,g:130,b:246},
+purple:{r:168,g:85,b:247},magenta:{r:236,g:72,b:153},white:{r:255,g:255,b:255}};
+if(colors[color]){Store.rgb=colors[color];this.updatePreview();this.updateSliders()}
+}).catch(()=>{});
+},
+sendRgb(){
+const{r,g,b}=Store.rgb;
+fetch('/api/rgb/color?r='+r+'&g='+g+'&b='+b).then(()=>{
+this.toast('RGB('+r+','+g+','+b+')');
+}).catch(()=>{});
+},
+updatePreview(){
+const{r,g,b}=Store.rgb;
+const color='rgb('+r+','+g+','+b+')';
+document.getElementById('color-preview').style.background=color;
+document.getElementById('rgb-icon').style.background='rgba('+r+','+g+','+b+',0.3)';
+document.getElementById('sl-r').value=r;
+document.getElementById('sl-g').value=g;
+document.getElementById('sl-b').value=b;
+},
+updateSliders(){
+const{r,g,b}=Store.rgb;
+document.getElementById('sl-r').value=r;
+document.getElementById('sl-g').value=g;
+document.getElementById('sl-b').value=b;
+},
+updateRgbFromSliders(){
+Store.rgb.r=parseInt(document.getElementById('sl-r').value);
+Store.rgb.g=parseInt(document.getElementById('sl-g').value);
+Store.rgb.b=parseInt(document.getElementById('sl-b').value);
+this.updatePreview();
+this.sendRgb();
+}
 };
 
 // Init

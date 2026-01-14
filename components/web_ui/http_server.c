@@ -4,6 +4,7 @@
 #include "app_state.h"
 #include "app_control.h"
 #include "config.h"
+#include "rgb_led.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -184,13 +185,72 @@ static esp_err_t api_mode_toggle_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+// RGB颜色设置处理 (自定义RGB值)
+static esp_err_t api_rgb_color_handler(httpd_req_t *req)
+{
+    char buf[64];
+    int ret = httpd_req_get_url_query_str(req, buf, sizeof(buf));
+    if (ret == ESP_OK) {
+        char r_str[8], g_str[8], b_str[8];
+        int r = 0, g = 255, b = 0;  // 默认绿色
+
+        if (httpd_query_key_value(buf, "r", r_str, sizeof(r_str)) == ESP_OK) {
+            r = atoi(r_str);
+            if (r < 0) r = 0;
+            if (r > 255) r = 255;
+        }
+        if (httpd_query_key_value(buf, "g", g_str, sizeof(g_str)) == ESP_OK) {
+            g = atoi(g_str);
+            if (g < 0) g = 0;
+            if (g > 255) g = 255;
+        }
+        if (httpd_query_key_value(buf, "b", b_str, sizeof(b_str)) == ESP_OK) {
+            b = atoi(b_str);
+            if (b < 0) b = 0;
+            if (b > 255) b = 255;
+        }
+
+        rgb_led_set_rgb((uint8_t)r, (uint8_t)g, (uint8_t)b);
+        ESP_LOGI(TAG, "RGB set to: R=%d G=%d B=%d", r, g, b);
+    }
+    httpd_resp_send(req, "OK", 2);
+    return ESP_OK;
+}
+
+// RGB预设颜色处理
+static esp_err_t api_rgb_preset_handler(httpd_req_t *req)
+{
+    char buf[32];
+    int ret = httpd_req_get_url_query_str(req, buf, sizeof(buf));
+    if (ret == ESP_OK) {
+        char color_str[16];
+        if (httpd_query_key_value(buf, "c", color_str, sizeof(color_str)) == ESP_OK) {
+            rgb_color_t color = RGB_COLOR_GREEN;
+            if (strcmp(color_str, "red") == 0) color = RGB_COLOR_RED;
+            else if (strcmp(color_str, "green") == 0) color = RGB_COLOR_GREEN;
+            else if (strcmp(color_str, "blue") == 0) color = RGB_COLOR_BLUE;
+            else if (strcmp(color_str, "yellow") == 0) color = RGB_COLOR_YELLOW;
+            else if (strcmp(color_str, "cyan") == 0) color = RGB_COLOR_CYAN;
+            else if (strcmp(color_str, "magenta") == 0) color = RGB_COLOR_MAGENTA;
+            else if (strcmp(color_str, "white") == 0) color = RGB_COLOR_WHITE;
+            else if (strcmp(color_str, "orange") == 0) color = RGB_COLOR_ORANGE;
+            else if (strcmp(color_str, "purple") == 0) color = RGB_COLOR_PURPLE;
+
+            rgb_led_set_color(color);
+            ESP_LOGI(TAG, "RGB preset: %s", color_str);
+        }
+    }
+    httpd_resp_send(req, "OK", 2);
+    return ESP_OK;
+}
+
 httpd_handle_t http_server_start(sensor_data_t *sensor_data)
 {
     g_sensor_data = sensor_data;
     
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = HTTP_SERVER_PORT;
-    config.max_uri_handlers = 12; // 增加handler数量限制
+    config.max_uri_handlers = 16; // 增加handler数量限制
     
     httpd_handle_t server = NULL;
     
@@ -260,6 +320,22 @@ httpd_handle_t http_server_start(sensor_data_t *sensor_data)
             .user_ctx = NULL
         };
         httpd_register_uri_handler(server, &api_mode_toggle_uri);
+
+        httpd_uri_t api_rgb_color_uri = {
+            .uri = "/api/rgb/color",
+            .method = HTTP_GET,
+            .handler = api_rgb_color_handler,
+            .user_ctx = NULL
+        };
+        httpd_register_uri_handler(server, &api_rgb_color_uri);
+
+        httpd_uri_t api_rgb_preset_uri = {
+            .uri = "/api/rgb/preset",
+            .method = HTTP_GET,
+            .handler = api_rgb_preset_handler,
+            .user_ctx = NULL
+        };
+        httpd_register_uri_handler(server, &api_rgb_preset_uri);
 
         ESP_LOGI(TAG, "HTTP server started on port %d", config.server_port);
         return server;
