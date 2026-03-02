@@ -5,7 +5,7 @@
 static const char *TAG = "MQ2";
 static adc_oneshot_unit_handle_t adc1_handle = NULL;
 
-esp_err_t mq2_init(adc1_channel_t adc_channel)
+esp_err_t mq2_init(adc_channel_t adc_channel)
 {
     // 配置ADC单元
     adc_oneshot_unit_init_cfg_t init_config = {
@@ -34,7 +34,7 @@ esp_err_t mq2_init(adc1_channel_t adc_channel)
     return ESP_OK;
 }
 
-esp_err_t mq2_read(adc1_channel_t adc_channel, uint32_t *value)
+esp_err_t mq2_read(adc_channel_t adc_channel, uint32_t *value)
 {
     if (value == NULL || adc1_handle == NULL) {
         return ESP_ERR_INVALID_ARG;

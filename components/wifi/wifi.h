@@ -39,4 +39,11 @@ uint8_t wifi_is_connected(void);
  */
 esp_err_t wifi_get_ip_string(char *ip_str, size_t len);
 
+/**
+ * @brief 反初始化WiFi资源（事件组、事件处理器、WiFi驱动）
+ *
+ * @return esp_err_t ESP_OK 成功
+ */
+esp_err_t app_wifi_deinit(void);
+
 #endif // WIFI_H

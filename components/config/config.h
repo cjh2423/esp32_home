@@ -2,12 +2,13 @@
 #define CONFIG_H
 
 // ==================== WiFi 配置 ====================
-// 输入您的 WiFi 名称和密码
+// 通过编译选项注入 WiFi 凭据:
+// -DWIFI_SSID=\"your_ssid\" -DWIFI_PASS=\"your_pass\"
 #ifndef WIFI_SSID
-#define WIFI_SSID "007"
+#define WIFI_SSID "OnePlus077"
 #endif
 #ifndef WIFI_PASS
-#define WIFI_PASS "liujiaming"
+#define WIFI_PASS "88888888"
 #endif
 #define WIFI_MAXIMUM_RETRY 5
 
@@ -26,8 +27,8 @@
 #define BUZZER_GPIO 6
 
 // 4. MQ-2 烟雾传感器 (ADC)
-// ESP32-S3: GPIO 7 对应 ADC1_CHANNEL_6
-#define MQ2_ADC_CHANNEL ADC1_CHANNEL_6  // GPIO 7
+// ESP32-S3: GPIO 7 对应 ADC_CHANNEL_6
+#define MQ2_ADC_CHANNEL ADC_CHANNEL_6  // GPIO 7
 
 // 5. 窗帘舵机控制 (PWM)
 #define SERVO_GPIO 8
