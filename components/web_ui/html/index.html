@@ -2,472 +2,925 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>智能家居</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Signal Deck · ESP32 Home</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Serif+SC:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{
---bg-deep:#050510;--bg-glass:rgba(20,20,40,0.7);--glass-border:rgba(100,120,255,0.2);
---primary:#6366f1;--cyan:#22d3ee;--orange:#f97316;--red:#ef4444;--green:#22c55e;
---text:#e2e8f0;--text-dim:#64748b;
---nav-h:70px;
-}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{
-font-family:'Noto Sans SC',sans-serif;background:var(--bg-deep);color:var(--text);
-height:100vh;overflow:hidden;display:flex;flex-direction:column;
-}
-/* Background FX */
-.bg-fx{position:fixed;inset:0;z-index:-1;pointer-events:none}
-.bg-fx::before{
-content:'';position:absolute;inset:0;
-background:radial-gradient(circle at 20% 30%,rgba(99,102,241,0.15),transparent 50%),
-radial-gradient(circle at 80% 70%,rgba(34,211,238,0.1),transparent 50%);
-}
-.scanline{
-position:fixed;inset:0;z-index:999;pointer-events:none;
-background:linear-gradient(to bottom,rgba(255,255,255,0),rgba(255,255,255,0) 50%,rgba(0,0,0,0.1) 50%,rgba(0,0,0,0.1));
-background-size:100% 4px;opacity:0.6;
+:root {
+  --bg: #070d12;
+  --panel: rgba(13, 22, 30, 0.8);
+  --panel-strong: rgba(11, 18, 24, 0.94);
+  --line: rgba(144, 178, 203, 0.28);
+  --line-soft: rgba(144, 178, 203, 0.14);
+  --text: #e8f3fa;
+  --text-dim: #97adb9;
+  --accent-hot: #ff8a3d;
+  --accent-cold: #34d5b6;
+  --accent-alert: #ff4d4f;
+  --accent-solar: #f6c54f;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  --font-display: "Bebas Neue", sans-serif;
+  --font-body: "Noto Serif SC", serif;
 }
 
-/* Header */
-.app-header{
-padding:20px 20px 10px;text-align:center;flex-shrink:0;
-display:flex;justify-content:space-between;align-items:center;
-border-bottom:1px solid rgba(255,255,255,0.05);
-background:rgba(5,5,16,0.8);backdrop-filter:blur(10px);
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
-.logo{font-family:'Orbitron';font-weight:900;letter-spacing:2px;background:linear-gradient(to right,var(--primary),var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.sys-status{font-family:'Orbitron';font-size:10px;color:var(--green);display:flex;align-items:center;gap:6px}
-.dot{width:6px;height:6px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
 
-/* Main View Container */
-.main-viewport{
-flex:1;position:relative;overflow:hidden;
+body {
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--text);
+  background: radial-gradient(circle at 15% 10%, rgba(255, 138, 61, 0.18), transparent 36%),
+              radial-gradient(circle at 85% 12%, rgba(52, 213, 182, 0.14), transparent 34%),
+              linear-gradient(150deg, #070d12 0%, #0b141b 52%, #060b11 100%);
+  overflow-x: hidden;
 }
-.view{
-position:absolute;inset:0;padding:20px;padding-bottom:var(--nav-h);
-overflow-y:auto;opacity:0;transform:translateY(10px);pointer-events:none;
-transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
-display:flex;flex-direction:column;gap:16px;
-}
-.view.active{opacity:1;transform:translateY(0);pointer-events:auto;z-index:10}
 
-/* Components */
-.card{
-background:var(--bg-glass);border:1px solid var(--glass-border);
-border-radius:16px;padding:16px;backdrop-filter:blur(20px);
-box-shadow:0 8px 32px rgba(0,0,0,0.2);
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.45;
+  background-image: linear-gradient(var(--line-soft) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+  z-index: -2;
 }
-.section-title{font-family:'Orbitron';font-size:12px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px;padding-left:4px}
 
-/* Dashboard Gauges */
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.gauge-box{text-align:center;padding:16px 0;position:relative}
-.gauge-svg{width:80px;height:80px;transform:rotate(-90deg)}
-.gauge-bg{fill:none;stroke:rgba(255,255,255,0.1);stroke-width:8}
-.gauge-val{fill:none;stroke-width:8;stroke-linecap:round;stroke-dasharray:220;stroke-dashoffset:220;transition:stroke-dashoffset 1s}
-.gauge-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);margin-top:-8px}
-.val-text{font-family:'Orbitron';font-size:18px;font-weight:700}
-.unit{font-size:10px;color:var(--text-dim)}
-.label{font-size:12px;color:var(--text-dim);margin-top:8px}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(7, 13, 18, 0) 65%, rgba(7, 13, 18, 0.8) 100%);
+  z-index: -1;
+}
 
-/* Device Controls */
-.dev-row{display:flex;justify-content:space-between;align-items:center}
-.dev-icon{width:40px;height:40px;background:rgba(99,102,241,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
-.dev-info{flex:1;margin-left:12px}
-.dev-name{font-size:14px;font-weight:500}
-.dev-status{font-size:12px;color:var(--text-dim)}
-/* Toggle */
-.toggle{width:50px;height:28px;background:rgba(255,255,255,0.1);border-radius:14px;position:relative;transition:0.3s;cursor:pointer}
-.toggle::after{content:'';position:absolute;top:2px;left:2px;width:24px;height:24px;background:#fff;border-radius:50%;transition:0.3s;box-shadow:0 2px 5px rgba(0,0,0,0.3)}
-.toggle.on{background:var(--primary);box-shadow:0 0 15px rgba(99,102,241,0.4)}
-.toggle.on::after{transform:translateX(22px)}
-/* Slider */
-.slider-con{margin-top:16px}
-.slider{width:100%;-webkit-appearance:none;appearance:none;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;outline:none}
-.slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;background:var(--primary);border-radius:50%;box-shadow:0 0 10px var(--primary)}
+.dashboard {
+  width: min(1240px, calc(100% - 28px));
+  margin: 16px auto 28px;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 14px;
+}
 
-/* RGB Color Picker */
-.rgb-section{margin-top:8px}
-.color-presets{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
-.color-btn{
-width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);
-cursor:pointer;transition:all 0.3s;position:relative;
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(9px);
+  animation: panelIn 0.6s ease both;
 }
-.color-btn:hover{transform:scale(1.15);border-color:rgba(255,255,255,0.5)}
-.color-btn.active{border-color:#fff;box-shadow:0 0 15px currentColor}
-.color-btn::after{content:'';position:absolute;inset:3px;border-radius:50%;background:inherit}
 
-/* Color Picker Wheel */
-.color-picker-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
-.color-wheel{
-width:180px;height:180px;border-radius:50%;
-background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);
-position:relative;cursor:crosshair;
-box-shadow:0 0 20px rgba(99,102,241,0.3);
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 35%);
+  opacity: 0.35;
 }
-.color-wheel::before{
-content:'';position:absolute;inset:0;border-radius:50%;
-background:radial-gradient(circle,#fff 0%,transparent 70%);
-}
-.color-wheel-pointer{
-position:absolute;width:16px;height:16px;border:2px solid #fff;
-border-radius:50%;transform:translate(-50%,-50%);
-box-shadow:0 0 5px rgba(0,0,0,0.5);pointer-events:none;
-}
-.color-preview{
-width:60px;height:60px;border-radius:12px;
-border:2px solid var(--glass-border);
-box-shadow:0 0 20px currentColor;
-}
-.rgb-sliders{width:100%;max-width:250px}
-.rgb-slider-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.rgb-slider-row span{width:20px;font-family:'Orbitron';font-size:12px;font-weight:700}
-.rgb-slider-row input{flex:1;height:6px}
-.rgb-slider-row input[type="range"]::-webkit-slider-thumb{width:14px;height:14px}
-.r-slider::-webkit-slider-thumb{background:#ef4444!important;box-shadow:0 0 8px #ef4444}
-.g-slider::-webkit-slider-thumb{background:#22c55e!important;box-shadow:0 0 8px #22c55e}
-.b-slider::-webkit-slider-thumb{background:#3b82f6!important;box-shadow:0 0 8px #3b82f6}
 
-/* System View */
-.mode-big{text-align:center;padding:30px 0}
-.mode-ring{width:120px;height:120px;border-radius:50%;border:2px solid var(--glass-border);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-size:18px;position:relative;transition:0.3s}
-.mode-ring.auto{border-color:var(--green);box-shadow:0 0 30px rgba(34,197,94,0.2);color:var(--green)}
-.mode-ring.manual{border-color:var(--orange);box-shadow:0 0 30px rgba(249,115,22,0.2);color:var(--orange)}
-.btn-block{width:100%;padding:14px;background:linear-gradient(135deg,var(--primary),#818cf8);border:none;border-radius:12px;color:#fff;font-family:'Orbitron';letter-spacing:1px;font-size:14px;cursor:pointer}
-
-/* Bottom Nav */
-.nav-bar{
-position:fixed;bottom:20px;left:20px;right:20px;height:60px;
-background:rgba(20,20,40,0.8);backdrop-filter:blur(20px);
-border-radius:20px;border:1px solid var(--glass-border);
-display:flex;justify-content:space-around;align-items:center;
-box-shadow:0 10px 40px rgba(0,0,0,0.3);z-index:100;
+.panel h2 {
+  font-family: var(--font-display);
+  letter-spacing: 1.7px;
+  font-size: 22px;
+  color: var(--accent-solar);
+  margin-bottom: 10px;
 }
-.nav-item{
-display:flex;flex-direction:column;align-items:center;gap:4px;
-color:var(--text-dim);font-size:10px;background:none;border:none;
-transition:0.3s;width:60px;cursor:pointer;
-}
-.nav-icon{font-size:20px;transition:0.3s}
-.nav-item.active{color:var(--primary)}
-.nav-item.active .nav-icon{transform:translateY(-2px);text-shadow:0 0 10px var(--primary)}
 
-/* Toast */
-.toast-box{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;flex-direction:column;gap:10px;pointer-events:none}
-.toast{background:rgba(20,20,40,0.9);border:1px solid var(--glass-border);padding:10px 20px;border-radius:30px;font-size:12px;display:flex;align-items:center;gap:8px;backdrop-filter:blur(10px);animation:slideDown 0.3s}
-@keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}
+.header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--panel-strong);
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: conic-gradient(from 35deg, var(--accent-solar), var(--accent-hot), var(--accent-cold), var(--accent-solar));
+  box-shadow: 0 0 20px rgba(246, 197, 79, 0.35);
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 34px;
+  letter-spacing: 2px;
+  line-height: 0.92;
+}
+
+.brand-sub {
+  color: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.header-info {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: rgba(12, 20, 27, 0.86);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cold);
+  box-shadow: 0 0 10px var(--accent-cold);
+}
+
+.env {
+  grid-column: span 7;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  background: rgba(10, 16, 21, 0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metric-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.metric-name {
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+.metric-value {
+  font-family: var(--font-display);
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.metric-unit {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(130, 157, 177, 0.18);
+  overflow: hidden;
+}
+
+.fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.35s ease;
+}
+
+.fill.temp { background: linear-gradient(90deg, #ffb43d, var(--accent-hot)); }
+.fill.humi { background: linear-gradient(90deg, #22d3ae, var(--accent-cold)); }
+.fill.light { background: linear-gradient(90deg, #f0d061, var(--accent-solar)); }
+.fill.smoke { background: linear-gradient(90deg, #ff7b7b, var(--accent-alert)); }
+
+.metric-tip {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.controls {
+  grid-column: span 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control-card {
+  border: 1px solid var(--line-soft);
+  background: rgba(9, 16, 22, 0.9);
+  border-radius: var(--radius-sm);
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-title {
+  font-size: 15px;
+}
+
+.control-state {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.toggle {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  width: 56px;
+  height: 32px;
+  background: rgba(129, 149, 162, 0.3);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #eaf4ff;
+  transition: transform 0.25s ease;
+}
+
+.toggle.on {
+  background: rgba(52, 213, 182, 0.35);
+  border-color: rgba(52, 213, 182, 0.65);
+  box-shadow: 0 0 18px rgba(52, 213, 182, 0.22);
+}
+
+.toggle.on::after {
+  transform: translateX(23px);
+}
+
+.range {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(130, 157, 177, 0.24);
+}
+
+.range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-solar);
+  box-shadow: 0 0 10px rgba(246, 197, 79, 0.7);
+}
+
+.range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-solar);
+}
+
+.lower-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+}
+
+.rgb-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preset {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.preset:hover,
+.preset.active {
+  transform: scale(1.12);
+  border-color: #f8fcff;
+}
+
+.rgb-grid {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.preview {
+  width: 132px;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 0 26px rgba(52, 213, 182, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.preview::before {
+  content: "RGB";
+  position: absolute;
+  inset: auto 10px 8px auto;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  color: rgba(10, 16, 22, 0.6);
+  font-size: 26px;
+}
+
+.rgb-line {
+  display: grid;
+  grid-template-columns: 20px 1fr 42px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.rgb-line span {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.rgb-line output {
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mode-badge {
+  width: 128px;
+  height: 128px;
+  margin: 6px auto;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 34px;
+  letter-spacing: 2px;
+  transition: all 0.3s ease;
+}
+
+.mode-badge.auto {
+  color: var(--accent-cold);
+  box-shadow: 0 0 24px rgba(52, 213, 182, 0.24);
+  border-color: rgba(52, 213, 182, 0.65);
+}
+
+.mode-badge.manual {
+  color: var(--accent-hot);
+  box-shadow: 0 0 24px rgba(255, 138, 61, 0.24);
+  border-color: rgba(255, 138, 61, 0.65);
+}
+
+.btn {
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(120deg, var(--accent-hot), var(--accent-solar));
+  color: #221506;
+  cursor: pointer;
+  width: 100%;
+  padding: 12px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+.toast-wrap {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(9, 16, 22, 0.95);
+  font-size: 12px;
+  color: var(--text);
+  animation: toastIn 0.25s ease;
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 980px) {
+  .env,
+  .controls { grid-column: 1 / -1; }
+  .lower-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .dashboard { width: calc(100% - 18px); gap: 10px; }
+  .panel { padding: 12px; border-radius: 14px; }
+  .brand-title { font-size: 28px; }
+  .env { grid-template-columns: 1fr; }
+  .rgb-grid { grid-template-columns: 1fr; }
+  .preview { width: 100%; max-width: 150px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
 </style>
 </head>
 <body>
-<div class="bg-fx"></div><div class="scanline"></div>
+<div class="dashboard">
+  <header class="panel header" style="animation-delay:.02s">
+    <div class="brand-wrap">
+      <div class="brand-mark"></div>
+      <div>
+        <div class="brand-title">Signal Deck</div>
+        <div class="brand-sub">ESP32 家居控制矩阵</div>
+      </div>
+    </div>
+    <div class="header-info">
+      <div class="chip"><span class="dot" id="netDot"></span><strong id="netText">ONLINE</strong></div>
+      <div class="chip">轮询 <strong>2s</strong></div>
+      <div class="chip" id="clock">--:--:--</div>
+    </div>
+  </header>
 
-<header class="app-header">
-<div class="logo">SMART HOME</div>
-<div class="sys-status"><span class="dot"></span>ONLINE</div>
-</header>
+  <section class="panel env" style="animation-delay:.08s">
+    <h2 style="grid-column:1/-1">环境总览</h2>
 
-<main class="main-viewport">
-<!-- Dashboard View -->
-<div id="view-dashboard" class="view active">
-<div class="section-title">ENVIRONMENT</div>
-<div class="grid-2">
-<div class="card gauge-box">
-<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-temp" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--orange)"/></svg>
-<div class="gauge-center"><div class="val-text" id="t-temp">--</div><div class="unit">°C</div></div>
-<div class="label">温度</div>
-</div>
-<div class="card gauge-box">
-<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-humi" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--cyan)"/></svg>
-<div class="gauge-center"><div class="val-text" id="t-humi">--</div><div class="unit">%</div></div>
-<div class="label">湿度</div>
-</div>
-<div class="card gauge-box">
-<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-light" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--primary)"/></svg>
-<div class="gauge-center"><div class="val-text" id="t-light">--</div><div class="unit">LUX</div></div>
-<div class="label">光照</div>
-</div>
-<div class="card gauge-box">
-<svg class="gauge-svg"><circle class="gauge-bg" cx="40" cy="40" r="35"/><circle id="g-smoke" class="gauge-val" cx="40" cy="40" r="35" style="stroke:var(--red)"/></svg>
-<div class="gauge-center"><div class="val-text" id="t-smoke">--</div><div class="unit">ADC</div></div>
-<div class="label">烟雾</div>
-</div>
-</div>
-<div class="section-title">QUICK STATUS</div>
-<div class="card" style="padding:12px;display:flex;justify-content:space-between">
-<span style="font-size:12px;color:var(--text-dim)">当前模式</span>
-<span id="q-mode" style="font-family:'Orbitron';color:var(--primary)">AUTO</span>
-</div>
+    <article class="metric">
+      <div class="metric-head">
+        <div class="metric-name">温度</div>
+        <div class="metric-value"><span id="tempValue">--</span><span class="metric-unit">°C</span></div>
+      </div>
+      <div class="track"><div class="fill temp" id="tempFill"></div></div>
+      <div class="metric-tip">舒适建议 18~26°C</div>
+    </article>
+
+    <article class="metric">
+      <div class="metric-head">
+        <div class="metric-name">湿度</div>
+        <div class="metric-value"><span id="humiValue">--</span><span class="metric-unit">%</span></div>
+      </div>
+      <div class="track"><div class="fill humi" id="humiFill"></div></div>
+      <div class="metric-tip">舒适建议 40~60%</div>
+    </article>
+
+    <article class="metric">
+      <div class="metric-head">
+        <div class="metric-name">光照</div>
+        <div class="metric-value"><span id="lightValue">--</span><span class="metric-unit">Lux</span></div>
+      </div>
+      <div class="track"><div class="fill light" id="lightFill"></div></div>
+      <div class="metric-tip">自动照明阈值 100 Lux</div>
+    </article>
+
+    <article class="metric">
+      <div class="metric-head">
+        <div class="metric-name">烟雾</div>
+        <div class="metric-value"><span id="smokeValue">--</span><span class="metric-unit">ADC</span></div>
+      </div>
+      <div class="track"><div class="fill smoke" id="smokeFill"></div></div>
+      <div class="metric-tip">报警阈值 2500</div>
+    </article>
+  </section>
+
+  <section class="panel controls" style="animation-delay:.12s">
+    <h2>设备控制</h2>
+
+    <article class="control-card">
+      <div class="control-row">
+        <div>
+          <div class="control-title">主照明</div>
+          <div class="control-state" id="ledStateText">--</div>
+        </div>
+        <button id="ledToggle" class="toggle" type="button" aria-label="切换照明"></button>
+      </div>
+      <input id="ledRange" class="range" type="range" min="0" max="255" value="0">
+    </article>
+
+    <article class="control-card">
+      <div class="control-row">
+        <div>
+          <div class="control-title">排风扇</div>
+          <div class="control-state" id="fanStateText">--</div>
+        </div>
+        <button id="fanToggle" class="toggle" type="button" aria-label="切换风扇"></button>
+      </div>
+      <input id="fanRange" class="range" type="range" min="0" max="255" value="0">
+    </article>
+
+    <article class="control-card">
+      <div class="control-row">
+        <div>
+          <div class="control-title">窗帘</div>
+          <div class="control-state" id="curtainStateText">--</div>
+        </div>
+        <button id="curtainToggle" class="toggle" type="button" aria-label="切换窗帘"></button>
+      </div>
+    </article>
+  </section>
+
+  <section class="lower-grid">
+    <section class="panel rgb-zone" style="animation-delay:.16s">
+      <h2>RGB Studio</h2>
+      <div class="preset-row" id="presetRow">
+        <button class="preset" data-color="red" style="background:#ef4444" aria-label="红色"></button>
+        <button class="preset" data-color="orange" style="background:#f97316" aria-label="橙色"></button>
+        <button class="preset" data-color="yellow" style="background:#facc15" aria-label="黄色"></button>
+        <button class="preset" data-color="green" style="background:#22c55e" aria-label="绿色"></button>
+        <button class="preset" data-color="cyan" style="background:#06b6d4" aria-label="青色"></button>
+        <button class="preset" data-color="blue" style="background:#3b82f6" aria-label="蓝色"></button>
+        <button class="preset" data-color="magenta" style="background:#ec4899" aria-label="品红"></button>
+        <button class="preset" data-color="white" style="background:#ffffff" aria-label="白色"></button>
+      </div>
+
+      <div class="rgb-grid">
+        <div class="preview" id="rgbPreview" style="background: rgb(34, 197, 94);"></div>
+        <div>
+          <div class="rgb-line">
+            <span style="color:#ef4444">R</span>
+            <input id="rRange" class="range" type="range" min="0" max="255" value="34">
+            <output id="rOut">34</output>
+          </div>
+          <div class="rgb-line">
+            <span style="color:#22c55e">G</span>
+            <input id="gRange" class="range" type="range" min="0" max="255" value="197">
+            <output id="gOut">197</output>
+          </div>
+          <div class="rgb-line">
+            <span style="color:#3b82f6">B</span>
+            <input id="bRange" class="range" type="range" min="0" max="255" value="94">
+            <output id="bOut">94</output>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="side-stack">
+      <section class="panel" style="animation-delay:.2s">
+        <h2>控制模式</h2>
+        <div id="modeBadge" class="mode-badge auto">AUTO</div>
+        <button id="modeToggle" class="btn" type="button">切换模式</button>
+      </section>
+
+    </section>
+  </section>
 </div>
 
-<!-- Devices View -->
-<div id="view-devices" class="view">
-<div class="section-title">LIGHTING</div>
-<div class="card">
-<div class="dev-row">
-<div class="dev-icon">💡</div>
-<div class="dev-info"><div class="dev-name">主照明</div><div class="dev-status" id="s-led">已关闭</div></div>
-<div class="toggle" id="btn-led" onclick="Actions.toggle('led')"></div>
-</div>
-<div class="slider-con"><input type="range" class="slider" min="0" max="255" id="sl-led" onchange="Actions.slide('led',this.value)"></div>
-</div>
-
-<div class="section-title">RGB LED</div>
-<div class="card rgb-section">
-<div class="dev-row" style="margin-bottom:16px">
-<div class="dev-icon" id="rgb-icon" style="background:rgba(34,197,94,0.3)">🌈</div>
-<div class="dev-info"><div class="dev-name">氛围灯</div><div class="dev-status">颜色控制</div></div>
-</div>
-<div class="color-presets">
-<div class="color-btn" style="background:#ef4444" onclick="Actions.rgbPreset('red')" title="红色"></div>
-<div class="color-btn" style="background:#f97316" onclick="Actions.rgbPreset('orange')" title="橙色"></div>
-<div class="color-btn" style="background:#eab308" onclick="Actions.rgbPreset('yellow')" title="黄色"></div>
-<div class="color-btn" style="background:#22c55e" onclick="Actions.rgbPreset('green')" title="绿色"></div>
-<div class="color-btn" style="background:#22d3ee" onclick="Actions.rgbPreset('cyan')" title="青色"></div>
-<div class="color-btn" style="background:#3b82f6" onclick="Actions.rgbPreset('blue')" title="蓝色"></div>
-<div class="color-btn" style="background:#a855f7" onclick="Actions.rgbPreset('purple')" title="紫色"></div>
-<div class="color-btn" style="background:#ec4899" onclick="Actions.rgbPreset('magenta')" title="品红"></div>
-<div class="color-btn" style="background:#fff" onclick="Actions.rgbPreset('white')" title="白色"></div>
-</div>
-<div class="color-picker-wrap">
-<div class="color-wheel" id="color-wheel">
-<div class="color-wheel-pointer" id="wheel-pointer" style="left:90px;top:90px"></div>
-</div>
-<div class="color-preview" id="color-preview" style="background:#22c55e"></div>
-<div class="rgb-sliders">
-<div class="rgb-slider-row"><span style="color:#ef4444">R</span><input type="range" class="slider r-slider" min="0" max="255" value="0" id="sl-r" oninput="Actions.updateRgbFromSliders()"></div>
-<div class="rgb-slider-row"><span style="color:#22c55e">G</span><input type="range" class="slider g-slider" min="0" max="255" value="255" id="sl-g" oninput="Actions.updateRgbFromSliders()"></div>
-<div class="rgb-slider-row"><span style="color:#3b82f6">B</span><input type="range" class="slider b-slider" min="0" max="255" value="0" id="sl-b" oninput="Actions.updateRgbFromSliders()"></div>
-</div>
-</div>
-</div>
-
-<div class="section-title">CLIMATE</div>
-<div class="card">
-<div class="dev-row">
-<div class="dev-icon">🌀</div>
-<div class="dev-info"><div class="dev-name">排风扇</div><div class="dev-status" id="s-fan">已关闭</div></div>
-<div class="toggle" id="btn-fan" onclick="Actions.toggle('fan')"></div>
-</div>
-<div class="slider-con"><input type="range" class="slider" min="0" max="255" id="sl-fan" onchange="Actions.slide('fan',this.value)"></div>
-</div>
-
-<div class="section-title">ACCESS</div>
-<div class="card">
-<div class="dev-row">
-<div class="dev-icon">🪟</div>
-<div class="dev-info"><div class="dev-name">智能窗帘</div><div class="dev-status" id="s-curt">已关闭</div></div>
-<div class="toggle" id="btn-curt" onclick="Actions.toggle('curtain')"></div>
-</div>
-</div>
-</div>
-
-<!-- System View -->
-<div id="view-system" class="view">
-<div class="section-title">CONTROL MODE</div>
-<div class="card mode-big">
-<div id="ring-mode" class="mode-ring auto">AUTO</div>
-<button class="btn-block" onclick="Actions.toggleMode()">切换模式 (SWITCH)</button>
-<p style="margin-top:16px;font-size:12px;color:var(--text-dim)">自动模式下设备将根据传感器数据自动运行</p>
-</div>
-<div class="section-title">SYSTEM INFO</div>
-<div class="card">
-<div class="dev-row" style="margin-bottom:8px"><span class="dev-status">Device IP</span><span class="dev-status" style="color:var(--text)">192.168.4.1</span></div>
-<div class="dev-row"><span class="dev-status">Firmware</span><span class="dev-status" style="color:var(--text)">v2.1.0 RGB</span></div>
-</div>
-</div>
-</main>
-
-<nav class="nav-bar">
-<button class="nav-item active" onclick="Router.go('dashboard')"><span class="nav-icon">🏠</span><span>概览</span></button>
-<button class="nav-item" onclick="Router.go('devices')"><span class="nav-icon">🎛️</span><span>设备</span></button>
-<button class="nav-item" onclick="Router.go('system')"><span class="nav-icon">⚙️</span><span>系统</span></button>
-</nav>
-
-<div class="toast-box" id="toast-box"></div>
+<div id="toastWrap" class="toast-wrap"></div>
 
 <script>
-// State Store
-const Store={
-data:{},
-rgb:{r:0,g:255,b:0},
-subscribers:[],
-update(d){
-const old=JSON.stringify(this.data);
-const neu=JSON.stringify(d);
-if(old!==neu){this.data={...this.data,...d};this.notify()}
-},
-subscribe(fn){this.subscribers.push(fn)},
-notify(){this.subscribers.forEach(fn=>fn(this.data))}
+const state = {
+  data: {},
+  rgb: { r: 34, g: 197, b: 94 },
+  rgbTimer: null,
+  online: true,
 };
 
-// Router
-const Router={
-go(id){
-document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
-document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-document.getElementById('view-'+id).classList.add('active');
-event.currentTarget.classList.add('active');
+const el = {
+  netDot: document.getElementById("netDot"),
+  netText: document.getElementById("netText"),
+  clock: document.getElementById("clock"),
+  tempValue: document.getElementById("tempValue"),
+  humiValue: document.getElementById("humiValue"),
+  lightValue: document.getElementById("lightValue"),
+  smokeValue: document.getElementById("smokeValue"),
+  tempFill: document.getElementById("tempFill"),
+  humiFill: document.getElementById("humiFill"),
+  lightFill: document.getElementById("lightFill"),
+  smokeFill: document.getElementById("smokeFill"),
+  ledStateText: document.getElementById("ledStateText"),
+  fanStateText: document.getElementById("fanStateText"),
+  curtainStateText: document.getElementById("curtainStateText"),
+  ledToggle: document.getElementById("ledToggle"),
+  fanToggle: document.getElementById("fanToggle"),
+  curtainToggle: document.getElementById("curtainToggle"),
+  ledRange: document.getElementById("ledRange"),
+  fanRange: document.getElementById("fanRange"),
+  modeBadge: document.getElementById("modeBadge"),
+  modeToggle: document.getElementById("modeToggle"),
+  rRange: document.getElementById("rRange"),
+  gRange: document.getElementById("gRange"),
+  bRange: document.getElementById("bRange"),
+  rOut: document.getElementById("rOut"),
+  gOut: document.getElementById("gOut"),
+  bOut: document.getElementById("bOut"),
+  rgbPreview: document.getElementById("rgbPreview"),
+  presetRow: document.getElementById("presetRow"),
+  toastWrap: document.getElementById("toastWrap"),
+};
+
+const presetColorMap = {
+  red: { r: 239, g: 68, b: 68 },
+  orange: { r: 249, g: 115, b: 22 },
+  yellow: { r: 250, g: 204, b: 21 },
+  green: { r: 34, g: 197, b: 94 },
+  cyan: { r: 6, g: 182, b: 212 },
+  blue: { r: 59, g: 130, b: 246 },
+  magenta: { r: 236, g: 72, b: 153 },
+  white: { r: 255, g: 255, b: 255 },
+};
+
+function toast(text) {
+  const item = document.createElement("div");
+  item.className = "toast";
+  item.textContent = text;
+  el.toastWrap.appendChild(item);
+  setTimeout(() => item.remove(), 2200);
 }
-};
 
-// UI Renderer
-const UI={
-init(){
-Store.subscribe(this.render);
-setInterval(()=>this.poll(),2000);
-this.poll();
-this.initColorWheel();
-},
-poll(){fetch('/api/data').then(r=>r.json()).then(d=>Store.update(d)).catch(()=>{})},
-render(d){
-// Dashboard
-const setG=(id,v,max)=>{
-const off=220*(1-Math.min(v/max,1));
-document.getElementById(id).style.strokeDashoffset=off;
-};
-setG('g-temp',d.temperature,50);document.getElementById('t-temp').innerText=d.temperature.toFixed(1);
-setG('g-humi',d.humidity,100);document.getElementById('t-humi').innerText=d.humidity.toFixed(0);
-setG('g-light',d.light,1000);document.getElementById('t-light').innerText=d.light.toFixed(0);
-setG('g-smoke',d.smoke,4095);document.getElementById('t-smoke').innerText=d.smoke;
-document.getElementById('q-mode').innerText=d.control_mode===0?'AUTO':'MANUAL';
-
-// Devices
-const setT=(id,s)=>{document.getElementById(id).className='toggle '+(s?'on':'')};
-setT('btn-led',d.led_state);document.getElementById('s-led').innerText=d.led_state?'已开启':'已关闭';
-document.getElementById('sl-led').value=d.led_brightness;
-setT('btn-fan',d.fan_state);document.getElementById('s-fan').innerText=d.fan_state?'已开启':'已关闭';
-document.getElementById('sl-fan').value=d.fan_speed;
-setT('btn-curt',d.curtain_state);document.getElementById('s-curt').innerText=d.curtain_state?'已开启':'已关闭';
-
-// System
-const rm=document.getElementById('ring-mode');
-if(d.control_mode===0){rm.className='mode-ring auto';rm.innerText='AUTO'}
-else{rm.className='mode-ring manual';rm.innerText='MANUAL'}
-},
-initColorWheel(){
-const wheel=document.getElementById('color-wheel');
-const pointer=document.getElementById('wheel-pointer');
-let isDragging=false;
-
-const getColorFromPos=(x,y)=>{
-const rect=wheel.getBoundingClientRect();
-const cx=rect.width/2,cy=rect.height/2;
-const dx=x-cx,dy=y-cy;
-const dist=Math.sqrt(dx*dx+dy*dy);
-const maxDist=rect.width/2;
-const angle=Math.atan2(dy,dx)*180/Math.PI+180;
-const sat=Math.min(dist/maxDist,1);
-return this.hslToRgb(angle/360,sat,0.5);
-};
-
-const updateFromPos=(clientX,clientY)=>{
-const rect=wheel.getBoundingClientRect();
-let x=clientX-rect.left,y=clientY-rect.top;
-const cx=rect.width/2,cy=rect.height/2;
-const dx=x-cx,dy=y-cy;
-const dist=Math.sqrt(dx*dx+dy*dy);
-const maxDist=rect.width/2;
-if(dist>maxDist){x=cx+dx/dist*maxDist;y=cy+dy/dist*maxDist}
-pointer.style.left=x+'px';
-pointer.style.top=y+'px';
-const rgb=getColorFromPos(x,y);
-Store.rgb=rgb;
-Actions.updatePreview();
-};
-
-wheel.addEventListener('mousedown',e=>{isDragging=true;updateFromPos(e.clientX,e.clientY)});
-wheel.addEventListener('touchstart',e=>{isDragging=true;updateFromPos(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});
-document.addEventListener('mousemove',e=>{if(isDragging)updateFromPos(e.clientX,e.clientY)});
-document.addEventListener('touchmove',e=>{if(isDragging)updateFromPos(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});
-document.addEventListener('mouseup',()=>{if(isDragging){isDragging=false;Actions.sendRgb()}});
-document.addEventListener('touchend',()=>{if(isDragging){isDragging=false;Actions.sendRgb()}});
-},
-hslToRgb(h,s,l){
-let r,g,b;
-if(s===0){r=g=b=l}else{
-const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};
-const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
-r=hue2rgb(p,q,h+1/3);g=hue2rgb(p,q,h);b=hue2rgb(p,q,h-1/3);
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
-return{r:Math.round(r*255),g:Math.round(g*255),b:Math.round(b*255)};
-}
-};
 
-// Actions
-const Actions={
-toast(msg){
-const b=document.getElementById('toast-box');
-const t=document.createElement('div');
-t.className='toast';
-const icon=document.createElement('span');
-icon.textContent='✓';
-t.appendChild(icon);
-t.appendChild(document.createTextNode(msg));
-b.appendChild(t);
-setTimeout(()=>t.remove(),2000);
-},
-async req(url,msg){
-try{
-const r=await fetch(url);
-if(r.ok){this.toast(msg);UI.poll()}
-}catch(e){console.error(e)}
-},
-toggle(dev){
-if(dev==='led') this.req('/api/led/toggle','照明切换');
-if(dev==='fan') this.req('/api/fan/toggle','风扇切换');
-if(dev==='curtain') this.req('/api/curtain/toggle','窗帘切换');
-},
-slide(dev,v){
-if(dev==='led') fetch('/api/led/brightness?value='+v);
-if(dev==='fan') fetch('/api/fan/speed?value='+v);
-},
-toggleMode(){this.req('/api/mode/toggle','模式已切换')},
-rgbPreset(color){
-fetch('/api/rgb/preset?c='+color).then(()=>{
-this.toast('RGB: '+color);
-// Update preview based on preset
-const colors={red:{r:239,g:68,b:68},orange:{r:249,g:115,b:22},yellow:{r:234,g:179,b:8},
-green:{r:34,g:197,b:94},cyan:{r:34,g:211,b:238},blue:{r:59,g:130,b:246},
-purple:{r:168,g:85,b:247},magenta:{r:236,g:72,b:153},white:{r:255,g:255,b:255}};
-if(colors[color]){Store.rgb=colors[color];this.updatePreview();this.updateSliders()}
-}).catch(()=>{});
-},
-sendRgb(){
-const{r,g,b}=Store.rgb;
-fetch('/api/rgb/color?r='+r+'&g='+g+'&b='+b).then(()=>{
-this.toast('RGB('+r+','+g+','+b+')');
-}).catch(()=>{});
-},
-updatePreview(){
-const{r,g,b}=Store.rgb;
-const color='rgb('+r+','+g+','+b+')';
-document.getElementById('color-preview').style.background=color;
-document.getElementById('rgb-icon').style.background='rgba('+r+','+g+','+b+',0.3)';
-document.getElementById('sl-r').value=r;
-document.getElementById('sl-g').value=g;
-document.getElementById('sl-b').value=b;
-},
-updateSliders(){
-const{r,g,b}=Store.rgb;
-document.getElementById('sl-r').value=r;
-document.getElementById('sl-g').value=g;
-document.getElementById('sl-b').value=b;
-},
-updateRgbFromSliders(){
-Store.rgb.r=parseInt(document.getElementById('sl-r').value);
-Store.rgb.g=parseInt(document.getElementById('sl-g').value);
-Store.rgb.b=parseInt(document.getElementById('sl-b').value);
-this.updatePreview();
-this.sendRgb();
+function setOnline(online) {
+  state.online = online;
+  el.netDot.style.background = online ? "var(--accent-cold)" : "var(--accent-alert)";
+  el.netDot.style.boxShadow = online ? "0 0 10px var(--accent-cold)" : "0 0 10px var(--accent-alert)";
+  el.netText.textContent = online ? "ONLINE" : "OFFLINE";
 }
-};
 
-// Init
-document.addEventListener('DOMContentLoaded',()=>UI.init());
+function formatNum(v, fixed) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "--";
+  return fixed != null ? n.toFixed(fixed) : String(n);
+}
+
+function setFill(node, value, max) {
+  const n = Number(value);
+  const ratio = Number.isFinite(n) ? clamp(n / max, 0, 1) : 0;
+  node.style.width = `${Math.round(ratio * 100)}%`;
+}
+
+function setToggle(node, on) {
+  node.classList.toggle("on", !!on);
+}
+
+async function controlRequest(path) {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      toast(`控制失败 (${res.status})`);
+      return false;
+    }
+
+    await pollData();
+    return true;
+  } catch (err) {
+    toast("网络异常，控制请求失败");
+    return false;
+  }
+}
+
+async function pollData() {
+  try {
+    const res = await fetch("/api/data", { cache: "no-store" });
+    if (!res.ok) {
+      setOnline(false);
+      return;
+    }
+
+    const data = await res.json();
+    state.data = data;
+    render();
+    setOnline(true);
+  } catch (err) {
+    setOnline(false);
+  }
+}
+
+function render() {
+  const d = state.data;
+
+  el.tempValue.textContent = formatNum(d.temperature, 1);
+  el.humiValue.textContent = formatNum(d.humidity, 0);
+  el.lightValue.textContent = formatNum(d.light, 0);
+  el.smokeValue.textContent = formatNum(d.smoke, 0);
+
+  setFill(el.tempFill, d.temperature, 50);
+  setFill(el.humiFill, d.humidity, 100);
+  setFill(el.lightFill, d.light, 1000);
+  setFill(el.smokeFill, d.smoke, 4095);
+
+  const statusText = (v) => (v === 1 || v === true ? "已开启" : "已关闭");
+
+  setToggle(el.ledToggle, d.led_state);
+  setToggle(el.fanToggle, d.fan_state);
+  setToggle(el.curtainToggle, d.curtain_state);
+
+  el.ledStateText.textContent = `${statusText(d.led_state)} · 亮度 ${Number(d.led_brightness || 0)}`;
+  el.fanStateText.textContent = `${statusText(d.fan_state)} · 转速 ${Number(d.fan_speed || 0)}`;
+  el.curtainStateText.textContent = statusText(d.curtain_state);
+
+  el.ledRange.value = Number(d.led_brightness || 0);
+  el.fanRange.value = Number(d.fan_speed || 0);
+
+  const mode = Number(d.control_mode);
+  const auto = mode === 0;
+  el.modeBadge.classList.toggle("auto", auto);
+  el.modeBadge.classList.toggle("manual", !auto);
+  el.modeBadge.textContent = auto ? "AUTO" : "MANUAL";
+}
+
+function renderRgb() {
+  const { r, g, b } = state.rgb;
+  el.rRange.value = r;
+  el.gRange.value = g;
+  el.bRange.value = b;
+  el.rOut.textContent = r;
+  el.gOut.textContent = g;
+  el.bOut.textContent = b;
+  el.rgbPreview.style.background = `rgb(${r}, ${g}, ${b})`;
+}
+
+function setActivePreset(color) {
+  document.querySelectorAll(".preset").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.color === color);
+  });
+}
+
+function clearActivePreset() {
+  document.querySelectorAll(".preset.active").forEach((btn) => btn.classList.remove("active"));
+}
+
+async function sendRgb() {
+  const { r, g, b } = state.rgb;
+  await controlRequest(`/api/rgb/color?r=${r}&g=${g}&b=${b}`);
+}
+
+function queueRgbSend() {
+  clearTimeout(state.rgbTimer);
+  state.rgbTimer = setTimeout(() => {
+    sendRgb();
+  }, 140);
+}
+
+function bindEvents() {
+  el.ledToggle.addEventListener("click", async () => {
+    const ok = await controlRequest("/api/led/toggle");
+    if (ok) toast("照明已切换");
+  });
+
+  el.fanToggle.addEventListener("click", async () => {
+    const ok = await controlRequest("/api/fan/toggle");
+    if (ok) toast("风扇已切换");
+  });
+
+  el.curtainToggle.addEventListener("click", async () => {
+    const ok = await controlRequest("/api/curtain/toggle");
+    if (ok) toast("窗帘已切换");
+  });
+
+  el.modeToggle.addEventListener("click", async () => {
+    const ok = await controlRequest("/api/mode/toggle");
+    if (ok) toast("模式已切换");
+  });
+
+  el.ledRange.addEventListener("change", async () => {
+    const value = clamp(Number(el.ledRange.value), 0, 255);
+    const ok = await controlRequest(`/api/led/brightness?value=${value}`);
+    if (ok) toast(`照明亮度 ${value}`);
+  });
+
+  el.fanRange.addEventListener("change", async () => {
+    const value = clamp(Number(el.fanRange.value), 0, 255);
+    const ok = await controlRequest(`/api/fan/speed?value=${value}`);
+    if (ok) toast(`风扇转速 ${value}`);
+  });
+
+  [el.rRange, el.gRange, el.bRange].forEach((node) => {
+    node.addEventListener("input", () => {
+      state.rgb = {
+        r: Number(el.rRange.value),
+        g: Number(el.gRange.value),
+        b: Number(el.bRange.value),
+      };
+      clearActivePreset();
+      renderRgb();
+      queueRgbSend();
+    });
+  });
+
+  el.presetRow.addEventListener("click", async (ev) => {
+    const target = ev.target.closest(".preset");
+    if (!target) return;
+
+    const color = target.dataset.color;
+    const rgb = presetColorMap[color];
+    if (!rgb) return;
+
+    const ok = await controlRequest(`/api/rgb/preset?c=${color}`);
+    if (!ok) return;
+
+    state.rgb = { ...rgb };
+    renderRgb();
+    setActivePreset(color);
+    toast(`RGB: ${color}`);
+  });
+}
+
+function tickClock() {
+  const now = new Date();
+  el.clock.textContent = now.toLocaleTimeString("zh-CN", { hour12: false });
+}
+
+function init() {
+  bindEvents();
+  renderRgb();
+  tickClock();
+  setInterval(tickClock, 1000);
+  pollData();
+  setInterval(pollData, 2000);
+}
+
+document.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
 </html>
