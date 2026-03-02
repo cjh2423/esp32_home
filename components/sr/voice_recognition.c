@@ -20,6 +20,9 @@ static const char *TAG = "VR";
 
 // 事件组标志位 (参考 xiaozhi-esp32)
 #define VR_EVENT_RUNNING    (1 << 0)
+#define VR_TASK_WAIT_TIMEOUT_MS 100
+#define VR_TASK_STOP_POLL_MS 10
+#define VR_TASK_STOP_TIMEOUT_MS 3000
 
 // 语音命令拼音定义
 static const char *s_commands[] = {
@@ -239,14 +242,14 @@ static void vr_detect_task(void *arg)
 
     while (s_task_running) {
         EventBits_t bits = xEventGroupWaitBits(s_event_group, VR_EVENT_RUNNING,
-                                                pdFALSE, pdTRUE, portMAX_DELAY);
+                                                pdFALSE, pdTRUE, pdMS_TO_TICKS(VR_TASK_WAIT_TIMEOUT_MS));
         if (!(bits & VR_EVENT_RUNNING) || !s_task_running) {
             continue;
         }
 
         // 使用扩展接口获取唤醒状态 (参考 xiaozhi afe_wake_word.cc:130)
         afe_fetch_result_t result;
-        esp_err_t ret = afe_processor_fetch_ex(s_afe, &result, portMAX_DELAY);
+        esp_err_t ret = afe_processor_fetch_ex(s_afe, &result, VR_TASK_WAIT_TIMEOUT_MS);
 
         if (!(xEventGroupGetBits(s_event_group) & VR_EVENT_RUNNING)) {
             continue;
@@ -419,15 +422,25 @@ esp_err_t vr_stop(void)
         return ESP_OK;
     }
 
-    xEventGroupClearBits(s_event_group, VR_EVENT_RUNNING);
     s_task_running = false;
+    if (s_event_group) {
+        // 先置位再清位，确保等待 RUNNING 的任务被唤醒并观察到停止标志
+        xEventGroupSetBits(s_event_group, VR_EVENT_RUNNING);
+        xEventGroupClearBits(s_event_group, VR_EVENT_RUNNING);
+    }
 
     if (s_afe) {
         afe_processor_reset(s_afe);
     }
 
-    for (int i = 0; i < 100 && (s_feed_task_handle != NULL || s_detect_task_handle != NULL); i++) {
-        vTaskDelay(pdMS_TO_TICKS(10));
+    const int max_poll = VR_TASK_STOP_TIMEOUT_MS / VR_TASK_STOP_POLL_MS;
+    for (int i = 0; i < max_poll && (s_feed_task_handle != NULL || s_detect_task_handle != NULL); i++) {
+        vTaskDelay(pdMS_TO_TICKS(VR_TASK_STOP_POLL_MS));
+    }
+
+    if (s_feed_task_handle != NULL || s_detect_task_handle != NULL) {
+        ESP_LOGE(TAG, "Failed to stop VR tasks within timeout");
+        return ESP_ERR_TIMEOUT;
     }
 
     s_state = VR_STATE_WAITING_WAKE;
@@ -442,7 +455,11 @@ esp_err_t vr_stop(void)
 
 esp_err_t vr_deinit(void)
 {
-    vr_stop();
+    esp_err_t stop_ret = vr_stop();
+    if (stop_ret != ESP_OK) {
+        ESP_LOGE(TAG, "VR deinit aborted: stop failed (%s)", esp_err_to_name(stop_ret));
+        return stop_ret;
+    }
 
     if (s_mn_iface && s_mn_model) {
         s_mn_iface->destroy(s_mn_model);

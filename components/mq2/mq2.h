@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "esp_err.h"
-#include "driver/adc.h"
+#include "esp_adc/adc_oneshot.h"
 
 /**
  * @brief 初始化 MQ-2 烟雾传感器
@@ -11,7 +11,7 @@
  * @param adc_channel ADC通道
  * @return esp_err_t ESP_OK 成功，其他值失败
  */
-esp_err_t mq2_init(adc1_channel_t adc_channel);
+esp_err_t mq2_init(adc_channel_t adc_channel);
 
 /**
  * @brief 读取 MQ-2 传感器值
@@ -20,7 +20,7 @@ esp_err_t mq2_init(adc1_channel_t adc_channel);
  * @param value 输出ADC值（0-4095）
  * @return esp_err_t ESP_OK 成功，其他值失败
  */
-esp_err_t mq2_read(adc1_channel_t adc_channel, uint32_t *value);
+esp_err_t mq2_read(adc_channel_t adc_channel, uint32_t *value);
 
 /**
  * @brief 判断是否检测到烟雾

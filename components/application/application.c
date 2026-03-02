@@ -75,6 +75,7 @@ static esp_err_t init_hardware(void);
 static esp_err_t init_network(const app_config_t *config);
 static esp_err_t init_voice(void);
 static esp_err_t start_tasks(void);
+static void run_control_once(sensor_data_t *sensor_data);
 
 static void sensor_task(void *pvParameters);
 static void control_task(void *pvParameters);
@@ -271,7 +272,7 @@ static void on_wifi_disconnected(void)
 
 static esp_err_t init_network(const app_config_t *config)
 {
-    if (config->wifi_ssid == NULL || config->wifi_password == NULL) {
+    if (config->wifi_ssid == NULL || config->wifi_ssid[0] == '\0') {
         ESP_LOGW(TAG, "WiFi credentials not provided, skipping network init");
         return ESP_OK;
     }
@@ -282,7 +283,8 @@ static esp_err_t init_network(const app_config_t *config)
 
         if (config->enable_http_server) {
             sensor_data_t *sensor_data = app_state_get();
-            if (http_server_start(sensor_data) != NULL) {
+            httpd_handle_t server = http_server_start(sensor_data);
+            if (server != NULL) {
                 s_init_status.http_ok = true;
             }
         }
@@ -337,6 +339,10 @@ static esp_err_t start_tasks(void)
     );
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create control task");
+        if (s_sensor_task_handle != NULL) {
+            vTaskDelete(s_sensor_task_handle);
+            s_sensor_task_handle = NULL;
+        }
         return ESP_FAIL;
     }
 
@@ -432,19 +438,77 @@ static void control_task(void *pvParameters)
 
     while (1) {
         // 等待传感器数据更新 (最多等待 2 倍采样周期)
-        if (xSemaphoreTake(s_sensor_data_ready, pdMS_TO_TICKS(SENSOR_READ_INTERVAL * 2)) == pdTRUE) {
-            // 执行控制逻辑
-            if (app_state_lock() == ESP_OK) {
-                app_control_process(sensor_data);
-                app_state_unlock();
-            }
-        }
-        // 即使没有新数据，也定期执行一次控制逻辑（确保系统响应）
-        else {
-            if (app_state_lock() == ESP_OK) {
-                app_control_process(sensor_data);
-                app_state_unlock();
-            }
+        xSemaphoreTake(s_sensor_data_ready, pdMS_TO_TICKS(SENSOR_READ_INTERVAL * 2));
+        run_control_once(sensor_data);
+    }
+}
+
+static void run_control_once(sensor_data_t *sensor_data)
+{
+    if (sensor_data == NULL) {
+        return;
+    }
+
+    sensor_data_t snapshot;
+    uint8_t baseline_fan_state = 0;
+    uint8_t baseline_fan_speed = 0;
+    uint8_t baseline_led_state = 0;
+    uint8_t baseline_led_brightness = 0;
+    if (app_state_lock() != ESP_OK) {
+        return;
+    }
+    snapshot = *sensor_data;
+    baseline_fan_state = sensor_data->fan_state;
+    baseline_fan_speed = sensor_data->fan_speed;
+    baseline_led_state = sensor_data->led_state;
+    baseline_led_brightness = sensor_data->led_brightness;
+    app_state_unlock();
+
+    app_control_process(&snapshot);
+
+    bool apply_latest_fan = false;
+    bool apply_latest_led = false;
+    uint8_t latest_fan_speed = 0;
+    uint8_t latest_led_state = 0;
+    uint8_t latest_led_brightness = 0;
+
+    if (app_state_lock() != ESP_OK) {
+        return;
+    }
+
+    // 仅在共享状态未被并发更新时回写，避免覆盖 UI/语音的新指令
+    bool fan_unchanged = (sensor_data->fan_state == baseline_fan_state) &&
+                         (sensor_data->fan_speed == baseline_fan_speed);
+    if (fan_unchanged) {
+        sensor_data->fan_state = snapshot.fan_state;
+        sensor_data->fan_speed = snapshot.fan_speed;
+    } else {
+        apply_latest_fan = true;
+        latest_fan_speed = sensor_data->fan_speed;
+    }
+
+    bool led_unchanged = (sensor_data->led_state == baseline_led_state) &&
+                         (sensor_data->led_brightness == baseline_led_brightness);
+    if (led_unchanged) {
+        sensor_data->led_state = snapshot.led_state;
+        sensor_data->led_brightness = snapshot.led_brightness;
+    } else {
+        apply_latest_led = true;
+        latest_led_state = sensor_data->led_state;
+        latest_led_brightness = sensor_data->led_brightness;
+    }
+
+    app_state_unlock();
+
+    // 发生并发冲突时，按共享状态重放一次硬件输出，避免短暂回退
+    if (apply_latest_fan) {
+        fan_set_speed(latest_fan_speed);
+    }
+    if (apply_latest_led) {
+        if (latest_led_state == 0) {
+            led_off(LED_PWM_CHANNEL);
+        } else {
+            led_set_brightness(LED_PWM_CHANNEL, latest_led_brightness);
         }
     }
 }

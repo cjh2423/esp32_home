@@ -10,8 +10,12 @@
 #include "buzzer.h"
 #include "mq2.h" // 需要用到 mq2_is_smoke_detected
 #include "rgb_led.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "APP_CTRL";
+
+#define SMOKE_ALARM_BEEP_INTERVAL_MS 10000
 
 // RGB LED 亮度配置
 #define RGB_BRIGHTNESS_BASE   10   // 基础亮度 (静音时) - 降低以节能
@@ -27,6 +31,10 @@ static struct {
     bool fan_on;       // 风扇当前是否开启
     bool led_on;       // LED当前是否开启
 } hysteresis_state = {false, false};
+
+// 烟雾报警状态，避免每个控制周期都重复蜂鸣与错误日志
+static bool s_smoke_alarm_active = false;
+static TickType_t s_last_smoke_beep_tick = 0;
 
 esp_err_t app_control_init(void)
 {
@@ -53,13 +61,34 @@ void app_control_process(sensor_data_t *data)
     uint8_t fan_speed = data->fan_speed;
     uint8_t fan_state = data->fan_state;
     if (mq2_is_smoke_detected(data->smoke, SMOKE_THRESHOLD)) {
-        ESP_LOGE(TAG, "Smoke Detected! Alarm!");
-        buzzer_beep(BUZZER_GPIO, BUZZER_BEEP_DURATION_MS);
+        TickType_t now = xTaskGetTickCount();
+        bool should_beep = false;
+
+        if (!s_smoke_alarm_active) {
+            s_smoke_alarm_active = true;
+            ESP_LOGE(TAG, "Smoke detected! Alarm active (value=%lu, threshold=%d)",
+                     (unsigned long)data->smoke, SMOKE_THRESHOLD);
+            should_beep = true;
+        } else if ((now - s_last_smoke_beep_tick) >= pdMS_TO_TICKS(SMOKE_ALARM_BEEP_INTERVAL_MS)) {
+            ESP_LOGW(TAG, "Smoke still detected (value=%lu), periodic alarm beep",
+                     (unsigned long)data->smoke);
+            should_beep = true;
+        }
+
+        if (should_beep) {
+            buzzer_beep(BUZZER_GPIO, BUZZER_BEEP_DURATION_MS);
+            s_last_smoke_beep_tick = now;
+        }
 
         fan_speed = FAN_SPEED_HIGH;
         fan_state = 1;
         hysteresis_state.fan_on = true;
     } else if (is_auto_mode) {
+        if (s_smoke_alarm_active) {
+            ESP_LOGI(TAG, "Smoke alarm cleared (value=%lu)", (unsigned long)data->smoke);
+            s_smoke_alarm_active = false;
+        }
+
         // 2. 自动模式：温度控制逻辑（带滞回）
         if (AUTO_FAN_ENABLE) {
             float temp = data->temperature;
@@ -100,6 +129,12 @@ void app_control_process(sensor_data_t *data)
                     fan_state = 0;
                 }
             }
+        }
+    }
+    else {
+        if (s_smoke_alarm_active) {
+            ESP_LOGI(TAG, "Smoke alarm cleared (value=%lu)", (unsigned long)data->smoke);
+            s_smoke_alarm_active = false;
         }
     }
     // 手动模式：保持用户设置的风扇状态，不自动调整
@@ -196,12 +231,24 @@ void app_control_handle_voice_command(vr_command_t command)
         return;
     }
 
+    bool apply_led = false;
+    uint8_t led_brightness = 0;
+    bool apply_fan = false;
+    uint8_t fan_speed = 0;
+    bool apply_curtain = false;
+    uint8_t curtain_state = 0;
+    bool apply_rgb = false;
+    rgb_color_t rgb_color = RGB_COLOR_GREEN;
+    bool apply_beep = false;
+    uint32_t beep_duration_ms = 0;
+
     switch (command) {
         case VR_CMD_LIGHT_ON:
             ESP_LOGI(TAG, "Voice: Turn on light");
             data->led_state = 1;
             data->led_brightness = LED_BRIGHTNESS_MAX;
-            led_set_brightness(LED_PWM_CHANNEL, LED_BRIGHTNESS_MAX);
+            apply_led = true;
+            led_brightness = LED_BRIGHTNESS_MAX;
             hysteresis_state.led_on = true;
             break;
 
@@ -209,7 +256,8 @@ void app_control_handle_voice_command(vr_command_t command)
             ESP_LOGI(TAG, "Voice: Turn off light");
             data->led_state = 0;
             data->led_brightness = LED_BRIGHTNESS_OFF;
-            led_off(LED_PWM_CHANNEL);
+            apply_led = true;
+            led_brightness = LED_BRIGHTNESS_OFF;
             hysteresis_state.led_on = false;
             break;
 
@@ -217,7 +265,8 @@ void app_control_handle_voice_command(vr_command_t command)
             ESP_LOGI(TAG, "Voice: Turn on fan");
             data->fan_state = 1;
             data->fan_speed = FAN_SPEED_MEDIUM;
-            fan_set_speed(FAN_SPEED_MEDIUM);
+            apply_fan = true;
+            fan_speed = FAN_SPEED_MEDIUM;
             hysteresis_state.fan_on = true;
             break;
 
@@ -225,7 +274,8 @@ void app_control_handle_voice_command(vr_command_t command)
             ESP_LOGI(TAG, "Voice: Turn off fan");
             data->fan_state = 0;
             data->fan_speed = FAN_SPEED_OFF;
-            fan_set_speed(FAN_SPEED_OFF);
+            apply_fan = true;
+            fan_speed = FAN_SPEED_OFF;
             hysteresis_state.fan_on = false;
             break;
 
@@ -233,45 +283,52 @@ void app_control_handle_voice_command(vr_command_t command)
             ESP_LOGI(TAG, "Voice: RGB Red");
             s_current_rgb_color = RGB_COLOR_RED;
             s_saved_rgb_color = RGB_COLOR_RED;  // 保留用户选择
-            rgb_led_set_color(RGB_COLOR_RED);
+            apply_rgb = true;
+            rgb_color = RGB_COLOR_RED;
             break;
 
         case VR_CMD_RGB_GREEN:
             ESP_LOGI(TAG, "Voice: RGB Green");
             s_current_rgb_color = RGB_COLOR_GREEN;
             s_saved_rgb_color = RGB_COLOR_GREEN;  // 保留用户选择
-            rgb_led_set_color(RGB_COLOR_GREEN);
+            apply_rgb = true;
+            rgb_color = RGB_COLOR_GREEN;
             break;
 
         case VR_CMD_RGB_BLUE:
             ESP_LOGI(TAG, "Voice: RGB Blue");
             s_current_rgb_color = RGB_COLOR_BLUE;
             s_saved_rgb_color = RGB_COLOR_BLUE;  // 保留用户选择
-            rgb_led_set_color(RGB_COLOR_BLUE);
+            apply_rgb = true;
+            rgb_color = RGB_COLOR_BLUE;
             break;
 
         case VR_CMD_CURTAIN_OPEN:
             ESP_LOGI(TAG, "Voice: Open curtain");
             data->curtain_state = 1;
-            curtain_control(1);
+            apply_curtain = true;
+            curtain_state = 1;
             break;
 
         case VR_CMD_CURTAIN_CLOSE:
             ESP_LOGI(TAG, "Voice: Close curtain");
             data->curtain_state = 0;
-            curtain_control(0);
+            apply_curtain = true;
+            curtain_state = 0;
             break;
 
         case VR_CMD_MODE_AUTO:
             ESP_LOGI(TAG, "Voice: Switch to AUTO mode");
             app_control_set_mode(data, CONTROL_MODE_AUTO);
-            buzzer_beep(BUZZER_GPIO, 50);  // 短提示音
+            apply_beep = true;
+            beep_duration_ms = 50;
             break;
 
         case VR_CMD_MODE_MANUAL:
             ESP_LOGI(TAG, "Voice: Switch to MANUAL mode");
             app_control_set_mode(data, CONTROL_MODE_MANUAL);
-            buzzer_beep(BUZZER_GPIO, 100);  // 长提示音区分
+            apply_beep = true;
+            beep_duration_ms = 100;
             break;
 
         default:
@@ -280,6 +337,30 @@ void app_control_handle_voice_command(vr_command_t command)
     }
 
     app_state_unlock();
+
+    if (apply_led) {
+        if (led_brightness == LED_BRIGHTNESS_OFF) {
+            led_off(LED_PWM_CHANNEL);
+        } else {
+            led_set_brightness(LED_PWM_CHANNEL, led_brightness);
+        }
+    }
+
+    if (apply_fan) {
+        fan_set_speed(fan_speed);
+    }
+
+    if (apply_curtain) {
+        curtain_control(curtain_state);
+    }
+
+    if (apply_rgb) {
+        rgb_led_set_color(rgb_color);
+    }
+
+    if (apply_beep) {
+        buzzer_beep(BUZZER_GPIO, beep_duration_ms);
+    }
 }
 
 void app_control_handle_vad_state(vr_vad_state_t state)
