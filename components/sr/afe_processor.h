@@ -99,7 +99,7 @@ esp_err_t afe_processor_feed(afe_processor_handle_t handle, int16_t *data);
  *
  * @param handle AFE 句柄
  * @param result 输出结果结构体
- * @param timeout_ms 超时时间 (portMAX_DELAY 表示无限等待)
+ * @param timeout_ms 超时时间（毫秒，建议传有限值）
  * @return esp_err_t ESP_OK 成功, ESP_ERR_TIMEOUT 超时
  */
 esp_err_t afe_processor_fetch_ex(afe_processor_handle_t handle,
