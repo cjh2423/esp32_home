@@ -1,0 +1,4 @@
+# HTTP server buffer sizes - needed for AP config portal
+# Mobile browsers send large headers (cookies, user-agent, etc.)
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
+CONFIG_HTTPD_MAX_URI_LEN=2048

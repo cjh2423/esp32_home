@@ -87,8 +87,8 @@ static void on_wifi_disconnected(void);
 esp_err_t app_start(void)
 {
     app_config_t config = {
-        .wifi_ssid = WIFI_SSID,
-        .wifi_password = WIFI_PASS,
+        .wifi_ssid = NULL,
+        .wifi_password = NULL,
         .enable_voice = true,
         .enable_http_server = true,
     };
@@ -272,13 +272,7 @@ static void on_wifi_disconnected(void)
 
 static esp_err_t init_network(const app_config_t *config)
 {
-    if (config->wifi_ssid == NULL || config->wifi_ssid[0] == '\0') {
-        ESP_LOGW(TAG, "WiFi credentials not provided, skipping network init");
-        return ESP_OK;
-    }
-
-    if (wifi_init_sta(config->wifi_ssid, config->wifi_password,
-                      on_wifi_connected, on_wifi_disconnected) == ESP_OK) {
+    if (wifi_start(on_wifi_connected, on_wifi_disconnected) == ESP_OK) {
         s_init_status.wifi_ok = true;
 
         if (config->enable_http_server) {
