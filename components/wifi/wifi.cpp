@@ -54,6 +54,11 @@ esp_err_t wifi_start(wifi_connected_callback_t connected_cb,
                      WifiManager::GetInstance().GetApSsid().c_str(),
                      WifiManager::GetInstance().GetApWebUrl().c_str());
             break;
+        case WifiEvent::ConfigModeExit:
+            /* 配网完成，切换到 Station 模式连接 */
+            ESP_LOGI(TAG, "Config mode exited, starting station");
+            WifiManager::GetInstance().StartStation();
+            break;
         default:
             break;
         }
