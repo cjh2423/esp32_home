@@ -1,5 +1,6 @@
 #include "app_state.h"
 
+#include "config.h"
 #include "esp_assert.h"
 #include <string.h>
 #include "esp_log.h"
@@ -11,6 +12,7 @@ static SemaphoreHandle_t g_sensor_mutex = NULL;
 void app_state_init(void)
 {
     memset(&g_sensor_data, 0, sizeof(g_sensor_data));
+    g_sensor_data.smoke_threshold = SMOKE_THRESHOLD;
     g_sensor_mutex = xSemaphoreCreateMutex();
     assert(g_sensor_mutex != NULL);
 }

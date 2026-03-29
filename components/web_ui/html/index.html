@@ -564,7 +564,11 @@ body::after {
         <div class="metric-value"><span id="smokeValue">--</span><span class="metric-unit">ADC</span></div>
       </div>
       <div class="track"><div class="fill smoke" id="smokeFill"></div></div>
-      <div class="metric-tip">报警阈值 2500</div>
+      <div class="metric-tip">
+        报警阈值
+        <input id="smokeThreshInput" type="number" min="100" max="4095" value="3500">
+        <button type="button" onclick="setSmokeThreshold()">设置</button>
+      </div>
     </article>
   </section>
 
@@ -673,6 +677,7 @@ const el = {
   humiFill: document.getElementById("humiFill"),
   lightFill: document.getElementById("lightFill"),
   smokeFill: document.getElementById("smokeFill"),
+  smokeThreshInput: document.getElementById("smokeThreshInput"),
   ledStateText: document.getElementById("ledStateText"),
   fanStateText: document.getElementById("fanStateText"),
   curtainStateText: document.getElementById("curtainStateText"),
@@ -776,6 +781,42 @@ async function pollData() {
   }
 }
 
+async function setSmokeThreshold() {
+  const value = clamp(Number(el.smokeThreshInput.value), 100, 4095);
+  el.smokeThreshInput.value = value;
+
+  try {
+    const res = await fetch("/api/smoke/threshold", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ threshold: value }),
+    });
+
+    if (!res.ok) {
+      let message = `设置失败 (${res.status})`;
+      try {
+        const data = await res.json();
+        if (data && data.message) {
+          message = data.message;
+        }
+      } catch (err) {}
+      toast(message);
+      return false;
+    }
+
+    toast(`烟雾阈值已更新为 ${value}`);
+    await pollData();
+    return true;
+  } catch (err) {
+    toast("网络异常，阈值设置失败");
+    return false;
+  }
+}
+
+window.setSmokeThreshold = setSmokeThreshold;
+
 function render() {
   const d = state.data;
 
@@ -788,6 +829,9 @@ function render() {
   setFill(el.humiFill, d.humidity, 100);
   setFill(el.lightFill, d.light, 1000);
   setFill(el.smokeFill, d.smoke, 4095);
+  if (d.smoke_threshold != null) {
+    el.smokeThreshInput.value = Number(d.smoke_threshold);
+  }
 
   const statusText = (v) => (v === 1 || v === true ? "已开启" : "已关闭");
 

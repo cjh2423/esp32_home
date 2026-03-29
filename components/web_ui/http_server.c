@@ -48,6 +48,32 @@ static esp_err_t send_ok(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+static esp_err_t recv_request_body(httpd_req_t *req, char *buf, size_t buf_size)
+{
+    if (req->content_len <= 0) {
+        return send_json_status(req, "400 Bad Request", "empty body");
+    }
+
+    if ((size_t)req->content_len >= buf_size) {
+        return send_json_status(req, "400 Bad Request", "body too large");
+    }
+
+    int total = 0;
+    while (total < req->content_len) {
+        int received = httpd_req_recv(req, buf + total, req->content_len - total);
+        if (received <= 0) {
+            if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+                continue;
+            }
+            return send_json_status(req, "400 Bad Request", "failed to read body");
+        }
+        total += received;
+    }
+
+    buf[total] = '\0';
+    return ESP_OK;
+}
+
 static esp_err_t require_sensor_data(httpd_req_t *req)
 {
     if (g_sensor_data == NULL) {
@@ -121,6 +147,7 @@ static esp_err_t api_data_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "humidity", snapshot.humidity);
     cJSON_AddNumberToObject(root, "light", snapshot.light);
     cJSON_AddNumberToObject(root, "smoke", snapshot.smoke);
+    cJSON_AddNumberToObject(root, "smoke_threshold", snapshot.smoke_threshold);
     cJSON_AddNumberToObject(root, "led_state", snapshot.led_state);
     cJSON_AddNumberToObject(root, "led_brightness", snapshot.led_brightness);
     cJSON_AddNumberToObject(root, "fan_state", snapshot.fan_state);
@@ -275,6 +302,46 @@ static esp_err_t api_mode_toggle_handler(httpd_req_t *req)
     return send_ok(req);
 }
 
+static esp_err_t api_smoke_threshold_handler(httpd_req_t *req)
+{
+    if (require_sensor_data(req) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    char body[128];
+    if (recv_request_body(req, body, sizeof(body)) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(body);
+    if (root == NULL) {
+        return send_json_status(req, "400 Bad Request", "invalid json");
+    }
+
+    cJSON *threshold = cJSON_GetObjectItemCaseSensitive(root, "threshold");
+    if (!cJSON_IsNumber(threshold)) {
+        cJSON_Delete(root);
+        return send_json_status(req, "400 Bad Request", "threshold must be a number");
+    }
+
+    int value = threshold->valueint;
+    cJSON_Delete(root);
+
+    if (value < 100 || value > 4095) {
+        return send_json_status(req, "400 Bad Request", "threshold out of range");
+    }
+
+    if (lock_state_or_503(req) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    g_sensor_data->smoke_threshold = (uint32_t)value;
+    app_state_unlock();
+
+    ESP_LOGI(TAG, "Smoke threshold updated to %d", value);
+    return send_ok(req);
+}
+
 static esp_err_t api_rgb_color_handler(httpd_req_t *req)
 {
     int r = 0;
@@ -385,6 +452,12 @@ httpd_handle_t http_server_start(sensor_data_t *sensor_data)
         .handler = api_mode_toggle_handler,
         .user_ctx = NULL,
     };
+    httpd_uri_t api_smoke_threshold_uri = {
+        .uri = "/api/smoke/threshold",
+        .method = HTTP_POST,
+        .handler = api_smoke_threshold_handler,
+        .user_ctx = NULL,
+    };
     httpd_uri_t api_rgb_color_uri = {
         .uri = "/api/rgb/color",
         .method = HTTP_POST,
@@ -407,6 +480,7 @@ httpd_handle_t http_server_start(sensor_data_t *sensor_data)
         &api_curtain_toggle_uri,
         &api_led_brightness_uri,
         &api_mode_toggle_uri,
+        &api_smoke_threshold_uri,
         &api_rgb_color_uri,
         &api_rgb_preset_uri,
     };

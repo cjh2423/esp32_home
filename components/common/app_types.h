@@ -20,6 +20,7 @@ typedef struct {
     float humidity;
     float light;
     uint32_t smoke;
+    uint32_t smoke_threshold;
 
     // 设备状态
     uint8_t led_state;

@@ -60,18 +60,18 @@ void app_control_process(sensor_data_t *data)
     // 1. 烟雾报警逻辑（安全优先 - 任何模式下都执行）
     uint8_t fan_speed = data->fan_speed;
     uint8_t fan_state = data->fan_state;
-    if (mq2_is_smoke_detected(data->smoke, SMOKE_THRESHOLD)) {
+    if (mq2_is_smoke_detected(data->smoke, data->smoke_threshold)) {
         TickType_t now = xTaskGetTickCount();
         bool should_beep = false;
 
         if (!s_smoke_alarm_active) {
             s_smoke_alarm_active = true;
             ESP_LOGE(TAG, "Smoke detected! Alarm active (value=%lu, threshold=%d)",
-                     (unsigned long)data->smoke, SMOKE_THRESHOLD);
+                     (unsigned long)data->smoke, (int)data->smoke_threshold);
             should_beep = true;
         } else if ((now - s_last_smoke_beep_tick) >= pdMS_TO_TICKS(SMOKE_ALARM_BEEP_INTERVAL_MS)) {
-            ESP_LOGW(TAG, "Smoke still detected (value=%lu), periodic alarm beep",
-                     (unsigned long)data->smoke);
+            ESP_LOGW(TAG, "Smoke still detected (value=%lu, threshold=%d), periodic alarm beep",
+                     (unsigned long)data->smoke, (int)data->smoke_threshold);
             should_beep = true;
         }
 
