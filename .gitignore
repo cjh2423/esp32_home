@@ -11,3 +11,4 @@ managed_components
 .claude/
 .serena/
 .clangd
+.cache/

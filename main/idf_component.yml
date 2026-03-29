@@ -1,4 +1,6 @@
 dependencies:
+  # WiFi AP配网组件
+  78/esp-wifi-connect: ">=3.1.1"
   # 依赖esp-sr组件
   espressif/esp-sr: "^2.3.0"
   # RGB LED Strip 驱动
