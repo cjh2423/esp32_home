@@ -239,6 +239,165 @@ body::after {
   color: var(--text-dim);
 }
 
+.metric.smoke-metric {
+  background:
+    linear-gradient(145deg, rgba(53, 12, 13, 0.38), rgba(10, 16, 21, 0.92) 46%),
+    rgba(10, 16, 21, 0.85);
+  border-color: rgba(255, 77, 79, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 122, 123, 0.08);
+}
+
+.smoke-threshold-panel {
+  margin-top: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 122, 123, 0.18);
+  background: linear-gradient(180deg, rgba(255, 77, 79, 0.08), rgba(255, 77, 79, 0.02));
+  display: grid;
+  gap: 10px;
+}
+
+.smoke-threshold-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.smoke-threshold-label {
+  color: #ffd7d7;
+  letter-spacing: 1px;
+}
+
+.smoke-threshold-live {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 122, 123, 0.2);
+  background: rgba(8, 12, 16, 0.56);
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #ffe1e1;
+}
+
+.smoke-threshold-live[data-state="editing"] {
+  color: #ffd272;
+  border-color: rgba(246, 197, 79, 0.28);
+}
+
+.smoke-threshold-live[data-state="saving"] {
+  color: #9bf2e3;
+  border-color: rgba(52, 213, 182, 0.36);
+}
+
+.smoke-threshold-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.smoke-threshold-input {
+  min-width: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 9, 13, 0.66);
+  padding: 9px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.smoke-threshold-input span {
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  color: rgba(255, 224, 224, 0.86);
+}
+
+.smoke-threshold-input input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 1px;
+}
+
+.smoke-threshold-input input::-webkit-outer-spin-button,
+.smoke-threshold-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.smoke-threshold-input input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.smoke-threshold-btn,
+.smoke-preset {
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+}
+
+.smoke-threshold-btn {
+  padding: 0 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff9f68, #f6c54f);
+  color: #2d1606;
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 1px;
+  box-shadow: 0 10px 20px rgba(246, 197, 79, 0.18);
+}
+
+.smoke-threshold-btn:hover,
+.smoke-preset:hover {
+  transform: translateY(-1px);
+}
+
+.smoke-threshold-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
+.smoke-threshold-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.smoke-threshold-hint {
+  color: rgba(255, 223, 223, 0.72);
+}
+
+.smoke-threshold-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.smoke-preset {
+  padding: 5px 9px;
+  border-radius: 999px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(8, 12, 16, 0.72);
+  color: rgba(255, 237, 237, 0.88);
+  font-size: 11px;
+}
+
+.smoke-preset.active {
+  border-color: rgba(255, 122, 123, 0.42);
+  box-shadow: 0 0 0 1px rgba(255, 77, 79, 0.16) inset;
+  color: #fff4f4;
+}
+
 .controls {
   grid-column: span 5;
   display: flex;
@@ -504,6 +663,8 @@ body::after {
   .env { grid-template-columns: 1fr; }
   .rgb-grid { grid-template-columns: 1fr; }
   .preview { width: 100%; max-width: 150px; }
+  .smoke-threshold-row { grid-template-columns: 1fr; }
+  .smoke-threshold-btn { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -558,16 +719,32 @@ body::after {
       <div class="metric-tip">自动照明阈值 100 Lux</div>
     </article>
 
-    <article class="metric">
+    <article class="metric smoke-metric">
       <div class="metric-head">
         <div class="metric-name">烟雾</div>
         <div class="metric-value"><span id="smokeValue">--</span><span class="metric-unit">ADC</span></div>
       </div>
       <div class="track"><div class="fill smoke" id="smokeFill"></div></div>
-      <div class="metric-tip">
-        报警阈值
-        <input id="smokeThreshInput" type="number" min="100" max="4095" value="3500">
-        <button type="button" onclick="setSmokeThreshold()">设置</button>
+      <div class="metric-tip smoke-threshold-panel">
+        <div class="smoke-threshold-top">
+          <span class="smoke-threshold-label">报警阈值控制</span>
+          <span id="smokeThreshLive" class="smoke-threshold-live" data-state="live">LIVE 3500</span>
+        </div>
+        <div class="smoke-threshold-row">
+          <label class="smoke-threshold-input">
+            <span>ADC</span>
+            <input id="smokeThreshInput" type="number" min="100" max="4095" value="3500" inputmode="numeric">
+          </label>
+          <button id="smokeThreshBtn" class="smoke-threshold-btn" type="button">应用</button>
+        </div>
+        <div class="smoke-threshold-meta">
+          <span id="smokeThreshHint" class="smoke-threshold-hint">范围 100 - 4095</span>
+          <div class="smoke-threshold-presets">
+            <button class="smoke-preset" type="button" data-threshold="2800">2800</button>
+            <button class="smoke-preset" type="button" data-threshold="3500">3500</button>
+            <button class="smoke-preset" type="button" data-threshold="3900">3900</button>
+          </div>
+        </div>
       </div>
     </article>
   </section>
@@ -663,6 +840,9 @@ const state = {
   rgb: { r: 34, g: 197, b: 94 },
   rgbTimer: null,
   online: true,
+  smokeDraft: null,
+  smokeDirty: false,
+  smokeSaving: false,
 };
 
 const el = {
@@ -678,6 +858,9 @@ const el = {
   lightFill: document.getElementById("lightFill"),
   smokeFill: document.getElementById("smokeFill"),
   smokeThreshInput: document.getElementById("smokeThreshInput"),
+  smokeThreshBtn: document.getElementById("smokeThreshBtn"),
+  smokeThreshLive: document.getElementById("smokeThreshLive"),
+  smokeThreshHint: document.getElementById("smokeThreshHint"),
   ledStateText: document.getElementById("ledStateText"),
   fanStateText: document.getElementById("fanStateText"),
   curtainStateText: document.getElementById("curtainStateText"),
@@ -697,6 +880,7 @@ const el = {
   rgbPreview: document.getElementById("rgbPreview"),
   presetRow: document.getElementById("presetRow"),
   toastWrap: document.getElementById("toastWrap"),
+  smokePresets: Array.from(document.querySelectorAll(".smoke-preset")),
 };
 
 const presetColorMap = {
@@ -745,6 +929,62 @@ function setToggle(node, on) {
   node.classList.toggle("on", !!on);
 }
 
+function getSmokeThresholdSource() {
+  const live = Number(state.data.smoke_threshold);
+  if (Number.isFinite(live)) {
+    return live;
+  }
+  return 3500;
+}
+
+function updateSmokeThresholdUi() {
+  const liveValue = getSmokeThresholdSource();
+  const draftText = state.smokeDraft == null ? "" : String(state.smokeDraft);
+  const draftValue = Number(draftText);
+  const hasDraft = draftText.trim() !== "" && Number.isFinite(draftValue);
+
+  if (!state.smokeDirty && document.activeElement !== el.smokeThreshInput) {
+    el.smokeThreshInput.value = liveValue;
+  } else if (state.smokeDirty && document.activeElement !== el.smokeThreshInput) {
+    el.smokeThreshInput.value = draftText;
+  }
+
+  el.smokeThreshBtn.disabled = state.smokeSaving;
+
+  if (state.smokeSaving) {
+    el.smokeThreshLive.dataset.state = "saving";
+    el.smokeThreshLive.textContent = `SYNC ${liveValue}`;
+    el.smokeThreshHint.textContent = "正在写入设备...";
+  } else if (state.smokeDirty && hasDraft) {
+    el.smokeThreshLive.dataset.state = "editing";
+    el.smokeThreshLive.textContent = `EDIT ${draftValue}`;
+    el.smokeThreshHint.textContent = `设备当前值 ${liveValue} · 按应用后生效`;
+  } else if (state.smokeDirty) {
+    el.smokeThreshLive.dataset.state = "editing";
+    el.smokeThreshLive.textContent = "EDIT";
+    el.smokeThreshHint.textContent = "请输入 100 - 4095 的整数";
+  } else {
+    el.smokeThreshLive.dataset.state = "live";
+    el.smokeThreshLive.textContent = `LIVE ${liveValue}`;
+    el.smokeThreshHint.textContent = "范围 100 - 4095";
+  }
+
+  el.smokePresets.forEach((node) => {
+    const presetValue = Number(node.dataset.threshold);
+    const activeValue = state.smokeDirty && hasDraft ? draftValue : liveValue;
+    node.classList.toggle("active", presetValue === activeValue);
+  });
+}
+
+function syncSmokeDraft(rawValue) {
+  const liveValue = getSmokeThresholdSource();
+  const draftText = String(rawValue ?? "");
+
+  state.smokeDraft = draftText;
+  state.smokeDirty = draftText.trim() !== String(liveValue);
+  updateSmokeThresholdUi();
+}
+
 async function controlRequest(path) {
   try {
     const res = await fetch(path, {
@@ -782,8 +1022,16 @@ async function pollData() {
 }
 
 async function setSmokeThreshold() {
-  const value = clamp(Number(el.smokeThreshInput.value), 100, 4095);
+  const parsed = Number(el.smokeThreshInput.value);
+  if (!Number.isFinite(parsed)) {
+    toast("请输入有效阈值");
+    return false;
+  }
+
+  const value = clamp(Math.round(parsed), 100, 4095);
   el.smokeThreshInput.value = value;
+  state.smokeSaving = true;
+  updateSmokeThresholdUi();
 
   try {
     const res = await fetch("/api/smoke/threshold", {
@@ -803,19 +1051,25 @@ async function setSmokeThreshold() {
         }
       } catch (err) {}
       toast(message);
+      state.smokeSaving = false;
+      updateSmokeThresholdUi();
       return false;
     }
 
+    state.data.smoke_threshold = value;
+    state.smokeDraft = value;
+    state.smokeDirty = false;
     toast(`烟雾阈值已更新为 ${value}`);
     await pollData();
     return true;
   } catch (err) {
     toast("网络异常，阈值设置失败");
     return false;
+  } finally {
+    state.smokeSaving = false;
+    updateSmokeThresholdUi();
   }
 }
-
-window.setSmokeThreshold = setSmokeThreshold;
 
 function render() {
   const d = state.data;
@@ -829,9 +1083,7 @@ function render() {
   setFill(el.humiFill, d.humidity, 100);
   setFill(el.lightFill, d.light, 1000);
   setFill(el.smokeFill, d.smoke, 4095);
-  if (d.smoke_threshold != null) {
-    el.smokeThreshInput.value = Number(d.smoke_threshold);
-  }
+  updateSmokeThresholdUi();
 
   const statusText = (v) => (v === 1 || v === true ? "已开启" : "已关闭");
 
@@ -887,6 +1139,37 @@ function queueRgbSend() {
 }
 
 function bindEvents() {
+  el.smokeThreshBtn.addEventListener("click", setSmokeThreshold);
+
+  el.smokeThreshInput.addEventListener("input", () => {
+    syncSmokeDraft(el.smokeThreshInput.value);
+  });
+
+  el.smokeThreshInput.addEventListener("focus", () => {
+    updateSmokeThresholdUi();
+  });
+
+  el.smokeThreshInput.addEventListener("blur", () => {
+    if (!state.smokeDirty) {
+      el.smokeThreshInput.value = getSmokeThresholdSource();
+    }
+    updateSmokeThresholdUi();
+  });
+
+  el.smokeThreshInput.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      setSmokeThreshold();
+    }
+  });
+
+  el.smokePresets.forEach((node) => {
+    node.addEventListener("click", () => {
+      el.smokeThreshInput.value = node.dataset.threshold;
+      syncSmokeDraft(node.dataset.threshold);
+    });
+  });
+
   el.ledToggle.addEventListener("click", async () => {
     const ok = await controlRequest("/api/led/toggle");
     if (ok) toast("照明已切换");
